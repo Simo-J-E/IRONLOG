@@ -29,8 +29,6 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      # The repository currently has no package-lock.json, so npm ci cannot run.
-      # Once a package-lock.json is committed, change this command to: npm ci
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
