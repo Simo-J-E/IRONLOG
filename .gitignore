@@ -1,0 +1,12 @@
+node_modules/
+dist/
+data/
+.env
+.env.local
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+backups/

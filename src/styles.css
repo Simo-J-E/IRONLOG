@@ -14,3 +14,20 @@
 @media (min-width:700px){.page{padding:42px 26px 120px}.program-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.today-page{max-width:720px;margin:auto}.bottom-nav{left:50%;right:auto;width:620px;transform:translateX(-50%);bottom:12px;border:3px solid var(--red);padding:5px}.workout-mode{max-width:760px;margin:0 auto;box-shadow:0 0 0 100vmax #141414;clip-path:inset(0 -100vmax)}.current-exercise{padding:28px}.set-header,.set-row{grid-template-columns:46px 100px 1fr 1fr 58px}.exercise-detail-grid{grid-template-columns:280px 1fr}.summary-page{padding-top:64px}.custom-exercises>div{grid-template-columns:1fr 80px 80px 80px 48px}}
 @media (prefers-reduced-motion:no-preference){button{transition:transform .12s ease,background-color .12s ease}.progress-line i{transition:width .2s ease}}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Durable workout state and optional account tools. */
+.status-chip{min-height:36px;background:transparent;font-size:11px;line-height:1.25;text-align:center;max-width:45%}
+.resume-list{display:grid;gap:10px;padding:18px 16px 0}
+.resume-card{display:block;width:100%;padding:16px;text-align:left;border:3px solid var(--red);background:var(--ink);color:var(--paper)}
+.resume-card span,.resume-card strong,.resume-card small{display:block;overflow-wrap:anywhere}
+.resume-card span{font-weight:900;font-size:14px;color:#efb2a2}.resume-card strong{font-size:22px;margin:5px 0}.resume-card small{font-size:14px}
+.workout-save-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#232323;color:var(--paper);padding:10px 14px;font-size:14px}
+.workout-save-bar span{margin-right:auto}.workout-save-bar button{min-height:44px;border:1px solid #a8a59e;background:transparent;color:var(--paper);padding:7px 10px}
+.save-warning{padding:14px 18px;background:#ffe8ac;border:2px solid #553c06;color:#241b0a;font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+.account-panel{padding:0 16px 130px;max-width:760px;margin:auto;line-height:1.5}.page:has(+.account-panel){padding-bottom:20px}
+.account-heading{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center}.account-heading strong{font-size:24px}.account-heading span{font-size:14px}
+.account-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.account-actions button{min-height:48px;padding:8px 14px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);font-size:16px;font-weight:700}.account-actions button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.account-panel .field-label{font-size:14px}.account-panel .field-label input{font-size:16px}.check-field{display:flex;align-items:flex-start;gap:12px;min-height:48px;margin:18px 0;font-size:16px}.check-field input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red)}
+.rank-table{overflow-x:auto}.rank-table table{width:100%;border-collapse:collapse;font-size:14px}.rank-table caption{text-align:left;font-weight:800;padding:12px 0}.rank-table td,.rank-table th{text-align:left;padding:12px 6px;border-bottom:2px solid #8a8274}.rank-table th[scope=row]{overflow-wrap:anywhere;max-width:140px}.rank-table .own-rank{background:var(--ink);color:var(--paper)}
+.my-rank{padding:12px;border-left:5px solid var(--red);font-size:16px}.my-rank strong{font-size:28px}.conflict-card{border:3px solid var(--red);padding:14px;margin:20px 0;background:var(--paper)}
+.loading p{font:400 16px/1.5 system-ui;max-width:480px;margin:20px}.loading button{min-height:48px;padding:8px 20px}.workout-mode .current-exercise{padding-bottom:120px}

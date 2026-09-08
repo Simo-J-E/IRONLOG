@@ -11,5 +11,5 @@ test('onboarding and workout logging flow', async ({ page }) => {
   await page.getByLabel('Set 1 weight').fill('80')
   await page.getByLabel('Set 1 reps').fill('8')
   await page.getByRole('button',{name:'✓'}).first().click()
-  await expect(page.getByText(/REST|TAUKO/)).toBeVisible()
+  await expect(page.getByText(/^(REST|TAUKO)$/)).toBeVisible()
 })
