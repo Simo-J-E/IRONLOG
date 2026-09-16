@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type { Collection, Exercise, Program, RemoteRecord, Settings, StoredRecord, SyncState, WorkoutLog } from './types'
 import { exercises, programs } from './data'
 import { collections, parseBackup, validateRecord } from './validation'
+import { localDateKey } from './schedule'
 
 export class IronlogDB extends Dexie {
   workouts!: Table<WorkoutLog, string>
@@ -34,9 +35,14 @@ export async function switchDatabase(accountId?: string) {
 export async function seedDatabase(store = db) {
   await store.open()
   await store.transaction('rw', store.programs, store.exercises, store.settings, async () => {
-    for (const p of programs) if (!await store.programs.get(p.id)) await store.programs.put(p)
+    for (const p of programs) {
+      const saved = await store.programs.get(p.id)
+      if (!saved || (!saved.custom && (saved.revision ?? 1) < (p.revision ?? 1))) await store.programs.put(p)
+    }
     for (const e of exercises) if (!await store.exercises.get(e.id)) await store.exercises.put(e)
-    if (!await store.settings.get('settings')) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 3, 5], autoRest: true })
+    const settings = await store.settings.get('settings')
+    if (!settings) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 3, 5], autoRest: true, scheduleStartDate: localDateKey(new Date()) })
+    else if (!settings.scheduleStartDate) await store.settings.put({ ...settings, scheduleStartDate: localDateKey(new Date()) })
   })
 }
 async function write(store: IronlogDB, collection: Collection, data: StoredRecord | null, id: string) {

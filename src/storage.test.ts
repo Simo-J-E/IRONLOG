@@ -107,3 +107,20 @@ describe('workout durability', () => {
     expect(await db.workouts.count()).toBe(1)
   })
 })
+
+it('updates the recommended built-in plan while preserving logs, snapshots, settings and custom programs', async () => {
+  const finished = { ...log(), workoutName: 'Original chest session', finishedAt: '2026-01-01T13:00:00.000Z', plan: { id: 'ca-a', name: 'Original chest session', exercises: [{ exerciseId: 'bench-press', sets: 4, repMin: 6, repMax: 8, restSeconds: 180 }] } }
+  await saveWorkout(finished)
+  const original = (await db.programs.get('chest-arms'))!
+  await db.programs.put({ ...original, revision: undefined, name: 'Chest + Arms Growth' })
+  const custom = { ...original, id: 'my-plan', revision: undefined, custom: true, name: 'My unchanged plan' }
+  await db.programs.put(custom)
+  const settings = (await db.settings.get('settings'))!
+  await db.settings.put({ ...settings, activeProgramId: custom.id, trainingDays: [0, 2, 4], scheduleStartDate: undefined })
+  await switchDatabase()
+  expect((await db.programs.get('chest-arms'))?.name).toBe('Chest, Back + Arms')
+  expect(await db.programs.get(custom.id)).toEqual(custom)
+  expect(await db.workouts.get(finished.id)).toEqual(finished)
+  expect(await db.settings.get('settings')).toMatchObject({ activeProgramId: custom.id, trainingDays: [0, 2, 4] })
+  expect((await db.settings.get('settings'))?.scheduleStartDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+})

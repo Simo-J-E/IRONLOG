@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { db, deleteAllData, exportAllData, importAllData, switchDatabase, saveWorkout, putRecord, removeRecord, checkpointWorkout, clearRecovery, flushWrites, timestamp, resumeIndex, remainingRest, requestPersistentStorage } from './storage'
-import { exercises as builtInExercises, findExercise, programs as builtInPrograms } from './data'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { db, seedDatabase, deleteAllData, exportAllData, importAllData, switchDatabase, saveWorkout, putRecord, removeRecord, checkpointWorkout, clearRecovery, flushWrites, timestamp, resumeIndex, remainingRest, requestPersistentStorage } from './storage'
+import { exercises as builtInExercises, programs as builtInPrograms } from './data'
 import { detectNewPr, displayWeight, epley, inputToKg, roundWeight, workoutVolume } from './utils'
 import { translate } from './i18n'
 import { MuscleFigure } from './MuscleFigure'
@@ -8,15 +8,14 @@ import { AccountPanel, type Credentials } from './AccountPanel'
 import { api, cacheAccount, cachedAccount } from './account'
 import { localStatus, syncAccount, waitForSync, type SyncStatus } from './sync'
 import type { Account, Exercise, Language, LoggedSet, Program, ProgramWorkout, Settings, Unit, WorkoutLog } from './types'
+import { Calendar, DayPicker, History, Programs, Today } from './TrainingViews'
+import { localDateKey, orderedDays, upcomingWorkouts } from './schedule'
 import './styles.css'
 
-type View = 'today'|'programs'|'history'|'profile'|'workout'|'exercise'|'summary'|'custom'
-const weekdays = ['SUN','MON','TUE','WED','THU','FRI','SAT']
-const fiWeekdays = ['SU','MA','TI','KE','TO','PE','LA']
-const defaultSettings: Settings = { id:'settings',language:'en',unit:'kg',onboardingDone:false,activeProgramId:'chest-arms',trainingDays:[1,3,5],autoRest:true }
+type View = 'today'|'programs'|'calendar'|'history'|'profile'|'workout'|'exercise'|'summary'|'custom'
+const defaultSettings: Settings = { id:'settings',language:'en',unit:'kg',onboardingDone:false,activeProgramId:'chest-arms',trainingDays:[1,3,5],autoRest:true,scheduleStartDate:localDateKey(new Date()) }
 const uid = () => crypto.randomUUID()
 function formatDuration(seconds=0) { const m=Math.floor(seconds/60); const s=seconds%60; return `${m}:${String(s).padStart(2,'0')}` }
-function workingSetCount(workout?: ProgramWorkout) { return workout?.exercises.reduce((n,e)=>n+e.sets,0) ?? 0 }
 
 export default function App() {
   const [ready,setReady]=useState(false)
@@ -25,6 +24,9 @@ export default function App() {
   const [allExercises,setAllExercises]=useState<Exercise[]>(builtInExercises)
   const [logs,setLogs]=useState<WorkoutLog[]>([])
   const [view,setView]=useState<View>('today')
+  const [calendarDate,setCalendarDate]=useState(()=>localDateKey(new Date()))
+  const [exerciseReturn,setExerciseReturn]=useState<View>('today')
+  const settingsRef=useRef(settings)
   const [activeLog,setActiveLog]=useState<WorkoutLog|null>(null)
   const activeRef=useRef<WorkoutLog|null>(null)
   const [selectedExercise,setSelectedExercise]=useState('bench-press')
@@ -47,9 +49,10 @@ export default function App() {
     const activeAtStart=activeRef.current
     await flushWrites()
     const store=db
+    await seedDatabase(store)
     const [savedSettings, savedPrograms, savedExercises, savedLogs]=await Promise.all([store.settings.get('settings'),store.programs.toArray(),store.exercises.toArray(),store.workouts.toArray()])
     if(store!==db)return
-    setSettings(savedSettings ?? defaultSettings); setPrograms(savedPrograms); setAllExercises(savedExercises)
+    settingsRef.current=savedSettings ?? defaultSettings; setSettings(settingsRef.current); setPrograms(savedPrograms); setAllExercises(savedExercises)
     const ordered=savedLogs.sort((a,b)=>b.startedAt.localeCompare(a.startedAt)); setLogs(ordered)
     const current=activeRef.current
     if(current!==activeAtStart&&!force)return
@@ -92,18 +95,19 @@ export default function App() {
   },[account,ready])
 
   const activeProgram=programs.find(p=>p.id===settings.activeProgramId) ?? programs[0]
-  const todayIndex = useMemo(()=>{
-    const pos=settings.trainingDays.indexOf(new Date().getDay()); return pos>=0 ? pos % Math.max(1,activeProgram?.workouts.length ?? 1) : -1
-  },[settings.trainingDays,activeProgram])
-  const nextWorkoutIndex = todayIndex>=0 ? todayIndex : (()=>{
-    const recent=logs.find(l=>l.programId===settings.activeProgramId && l.finishedAt)
-    if(!recent) return 0
-    const idx=activeProgram?.workouts.findIndex(w=>w.id===recent.workoutId) ?? -1
-    return (idx+1) % Math.max(1,activeProgram?.workouts.length ?? 1)
-  })()
-  const todayWorkout=activeProgram?.workouts[nextWorkoutIndex]
+  const today=new Date(now)
+  const todayWorkout=upcomingWorkouts(activeProgram,settings,logs,today,1)[0]?.workout
   const activeWorkout=activeLog?.plan ?? programs.find(p=>p.id===activeLog?.programId)?.workouts.find(w=>w.id===activeLog?.workoutId)
-  async function persistSettings(patch:Partial<Settings>){ const next={...settings,...patch};setSettings(next);try{await putRecord('settings',next)}catch(e){showError(e)} }
+  async function persistSettings(patch:Partial<Settings>){
+    const previous=settingsRef.current
+    const scheduling=patch.activeProgramId!==undefined&&patch.activeProgramId!==previous.activeProgramId || patch.trainingDays!==undefined&&JSON.stringify(orderedDays(patch.trainingDays))!==JSON.stringify(orderedDays(previous.trainingDays))
+    const next={...previous,...patch,...(patch.trainingDays?{trainingDays:orderedDays(patch.trainingDays)}:{}),...(scheduling?{scheduleStartDate:localDateKey(new Date())}:{})}
+    settingsRef.current=next;setSettings(next)
+    try{await putRecord('settings',next)}catch(error){if(settingsRef.current===next){settingsRef.current=previous;setSettings(previous)}showError(error)}
+  }
+  function openExercise(id:string){setExerciseReturn(view);setSelectedExercise(id);setView('exercise')}
+  function openCalendar(date=localDateKey(new Date())){setCalendarDate(date);setView('calendar')}
+
   function resume(log:WorkoutLog){activeRef.current=log;setActiveLog(log);setNow(Date.now());setView('workout')}
   async function updateActive(next:WorkoutLog){
     const log={...next,updatedAt:timestamp()};activeRef.current=log;setActiveLog(log);setSaveState('Saving…')
@@ -154,7 +158,7 @@ export default function App() {
     setSummary(finished);activeRef.current=null;setActiveLog(null);await reload();setView('summary')
   }
   const exerciseHistory=(id:string)=>logs.filter(l=>l.finishedAt&&l.exercises.some(e=>e.exerciseId===id)).map(l=>({log:l,sets:l.exercises.find(e=>e.exerciseId===id)!.sets.filter(s=>s.completed)})).filter(x=>x.sets.length)
-  async function chooseProgram(id:string){await persistSettings({activeProgramId:id});setView('today')}
+  async function chooseProgram(id:string){await persistSettings({activeProgramId:id});if(settingsRef.current.activeProgramId===id)openCalendar()}
   async function deleteProgram(id:string){if(!confirm('Delete this custom program?'))return;try{await removeRecord('programs',id);if(settings.activeProgramId===id)await persistSettings({activeProgramId:'chest-arms'});await reload()}catch(e){showError(e)}}
   function newCustomProgram(){setCustomDraft({id:`custom-${uid()}`,name:'My Program',description:'Custom training program',daysPerWeek:3,duration:'60 min',focus:'Custom',level:'Custom',custom:true,workouts:[{id:uid(),name:'Workout A',exercises:[]}]});setView('custom')}
   async function editProgram(p:Program){setCustomDraft(structuredClone(p));setView('custom')}
@@ -194,20 +198,21 @@ export default function App() {
   const syncNow=async()=>{if(account)await syncAccount(account,setSyncStatus)}
   if(!ready)return <main className="loading"><div><strong>IRONLOG</strong>{error&&<><p role="alert">{error}</p><button onClick={()=>window.location.reload()}>Retry</button><button onClick={exportData}>Export recovery data</button></>}</div></main>
   if(!settings.onboardingDone&&!account)return <Onboarding step={onboardingStep} setStep={setOnboardingStep} settings={settings} programs={programs} onSettings={persistSettings} onDone={()=>persistSettings({onboardingDone:true})}/>
-  const nav=<nav className="bottom-nav" aria-label="Main navigation">{(['today','programs','history','profile'] as View[]).map(v=><button key={v} className={view===v?'active':''} onClick={()=>setView(v)}><span>{v==='today'?'01':v==='programs'?'02':v==='history'?'03':'04'}</span>{tr(v as 'today'|'programs'|'history'|'profile')}</button>)}</nav>
+  const nav=<nav className="bottom-nav" aria-label="Main navigation">{(['today','programs','calendar','history','profile'] as const).map((item,index)=><button key={item} className={view===item?'active':''} aria-current={view===item?'page':undefined} onClick={()=>setView(item)}><span>{String(index+1).padStart(2,'0')}</span>{tr(item)}</button>)}</nav>
   const unfinished=logs.filter(l=>!l.finishedAt&&l.id!==activeLog?.id)
   return <div className="app-shell">
     <header className="brandbar"><button className="brand" onClick={()=>setView('today')} aria-label="IRONLOG home"><span className="brand-mark">I</span>IRONLOG</button><button className="status-chip" onClick={()=>setView('profile')}>{saveState==='Save failed'?'SAVE FAILED':account?syncStatus.state==='synced'?'ACCOUNT SYNCED':syncStatus.state==='syncing'?'SYNCING…':'DEVICE SAVED':'LOCAL / OFFLINE'}</button></header>
     {error&&<div className="save-warning" role="alert">{error}<button className="text-button" onClick={()=>setError('')}>Dismiss</button><button className="text-button" onClick={exportData}>Export data</button></div>}
     <main className="content">
       {view!=='workout'&&view!=='exercise'&&(activeLog||unfinished.length>0)&&<div className="resume-list">{[...(activeLog?[activeLog]:[]),...unfinished].map(log=><button className="resume-card" key={log.id} onClick={()=>resume(log)}><span>RESUME WORKOUT</span><strong>{log.workoutName}</strong><small>Exercise {resumeIndex(log)+1} of {log.exercises.length} · {log.exercises.reduce((n,e)=>n+e.sets.filter(s=>s.completed).length,0)} sets completed</small></button>)}</div>}
-      {view==='today'&&<Today program={activeProgram} workout={todayWorkout} settings={settings} logs={logs} tr={tr} onStart={()=>startWorkout()} onExercise={id=>{setSelectedExercise(id);setView('exercise')}}/>}
-      {view==='programs'&&<Programs programs={programs} activeId={settings.activeProgramId} tr={tr} choose={chooseProgram} newCustom={newCustomProgram} edit={editProgram} remove={deleteProgram}/>}
-      {view==='history'&&<History logs={logs} exercises={allExercises} settings={settings} tr={tr} onExercise={id=>{setSelectedExercise(id);setView('exercise')}}/>}
+      {view==='today'&&<Today program={activeProgram} settings={settings} logs={logs} exercises={allExercises} onStart={startWorkout} onExercise={openExercise} onCalendar={openCalendar} onPrograms={()=>setView('programs')} onHistory={()=>setView('history')} today={today}/>}
+      {view==='programs'&&<Programs programs={programs} settings={settings} exercises={allExercises} onExercise={openExercise} choose={chooseProgram} newCustom={newCustomProgram} edit={editProgram} remove={deleteProgram} onCalendar={()=>openCalendar()}/>}
+      {view==='calendar'&&<Calendar program={activeProgram} settings={settings} exercises={allExercises} logs={logs} onExercise={openExercise} onStart={startWorkout} onResume={resume} onDays={days=>{void persistSettings({trainingDays:days})}} selectedDate={calendarDate} onDate={setCalendarDate} onPrograms={()=>setView('programs')} today={today}/>}
+      {view==='history'&&<History logs={logs} exercises={allExercises} settings={settings} onExercise={openExercise} onResume={resume}/>}
       {view==='profile'&&<><Profile settings={settings} tr={tr} onSettings={persistSettings} onExport={exportData} onImport={()=>fileInput.current?.click()} onDelete={wipe}/><AccountPanel account={account} status={syncStatus} onAuthenticate={authenticate} onLogout={logout} onAccount={user=>{cacheAccount(user);setAccount(user)}} onSync={syncNow} onDelete={deleteAccount}/></>}
-      {view==='workout'&&activeLog&&<><div className="workout-save-bar"><span role="status">{saveState}</span><button onClick={()=>{void reload();setView('today')}}>Save & exit</button><button onClick={finishWorkout}>Finish</button></div><WorkoutMode log={activeLog} workout={activeWorkout} exerciseIndex={activeExerciseIndex} exercises={allExercises} settings={settings} tr={tr} history={logs} onSet={updateSet} onDoneSet={completeSet} onAddSet={addSet} onDeleteSet={deleteSet} onExerciseIndex={index=>changeProgress({exerciseIndex:index})} onFinish={finishWorkout} onInfo={id=>{setSelectedExercise(id);setView('exercise')}} onAddExercise={addExerciseDuringWorkout} restSeconds={restSeconds} restRunning={restRunning} onRestAdd={()=>changeProgress({restEndsAt:Math.max(Date.now(),activeRef.current?.progress?.restEndsAt??0)+30000})} onRestSkip={()=>changeProgress({restEndsAt:null})}/></>}
-      {view==='exercise'&&<ExerciseDetail exercise={allExercises.find(e=>e.id===selectedExercise)??allExercises[0]!} history={exerciseHistory(selectedExercise)} settings={settings} tr={tr} onBack={()=>setView(activeLog?'workout':'history')}/>}
-      {view==='summary'&&summary&&<Summary log={summary} previous={logs.filter(l=>l.id!==summary.id&&l.finishedAt)} settings={settings} exercises={allExercises} tr={tr} onDone={()=>setView('today')}/>}
+      {view==='workout'&&activeLog&&<><div className="workout-save-bar"><span role="status">{saveState}</span><button onClick={()=>{void reload();setView('today')}}>Save & exit</button><button onClick={finishWorkout}>Finish</button></div><WorkoutMode log={activeLog} workout={activeWorkout} exerciseIndex={activeExerciseIndex} exercises={allExercises} settings={settings} tr={tr} history={logs} onSet={updateSet} onDoneSet={completeSet} onAddSet={addSet} onDeleteSet={deleteSet} onExerciseIndex={index=>changeProgress({exerciseIndex:index})} onFinish={finishWorkout} onInfo={openExercise} onAddExercise={addExerciseDuringWorkout} restSeconds={restSeconds} restRunning={restRunning} onRestAdd={()=>changeProgress({restEndsAt:Math.max(Date.now(),activeRef.current?.progress?.restEndsAt??0)+30000})} onRestSkip={()=>changeProgress({restEndsAt:null})}/></>}
+      {view==='exercise'&&<ExerciseDetail exercise={allExercises.find(e=>e.id===selectedExercise)??allExercises[0]!} history={exerciseHistory(selectedExercise)} settings={settings} tr={tr} onBack={()=>setView(exerciseReturn)}/>}
+      {view==='summary'&&summary&&<Summary log={summary} previous={logs.filter(l=>l.id!==summary.id&&l.finishedAt)} settings={settings} exercises={allExercises} tr={tr} onDone={()=>setView('today')} onHistory={()=>setView('history')}/>}
       {view==='custom'&&customDraft&&<CustomProgram draft={customDraft} setDraft={setCustomDraft} exercises={allExercises} tr={tr} onSave={saveCustom} onCancel={()=>setView('programs')}/>}
     </main>
     {!['workout','exercise','summary','custom'].includes(view)&&nav}
@@ -219,32 +224,8 @@ function Onboarding({step,setStep,settings,programs,onSettings,onDone}:{step:num
   const tr=(k:Parameters<typeof translate>[1])=>translate(settings.language,k)
   const featured=programs.find(p=>p.featured)??programs[0]!
   if(step===1)return <main className="onboarding poster"><div className="plate-logo">I</div><p className="eyebrow">PHYSICAL TRAINING RECORD / 01</p><h1>IRONLOG</h1><h2>BUILD.<br/>LOG.<br/><span>PROGRESS.</span></h2><button className="primary massive" onClick={()=>setStep(2)}>{tr('getStarted')}</button></main>
-  if(step===2)return <main className="onboarding"><p className="eyebrow">PROGRAM / 02</p><h1>{tr('choose')}</h1><article className="program-card featured"><div className="stamp">{tr('recommended')}</div><h2>{featured.name}</h2><p>{featured.daysPerWeek} DAYS / WEEK · {featured.duration}</p><p>{featured.description}</p><button className="primary" onClick={()=>setStep(3)}>SELECT</button></article><button className="text-button" onClick={()=>onSettings({onboardingDone:true})}>Use another program later</button></main>
-  return <main className="onboarding"><p className="eyebrow">SCHEDULE / 03</p><h1>{tr('trainingDays')}</h1><DayPicker value={settings.trainingDays} onChange={(days)=>onSettings({trainingDays:days})} lang={settings.language}/><p className="muted">Choose any three days. Missed workouts can be done later.</p><button className="primary massive" onClick={onDone}>{tr('startTraining')}</button></main>
-}
-
-function DayPicker({value,onChange,lang}:{value:number[];onChange:(n:number[])=>void;lang:Language}){
-  const labels=lang==='fi'?fiWeekdays:weekdays.map(x=>x.slice(0,2))
-  return <div className="day-picker">{[1,2,3,4,5,6,0].map(day=><button key={day} className={value.includes(day)?'selected':''} onClick={()=>{const has=value.includes(day); const next=has?value.filter(d=>d!==day):[...value,day]; if(next.length>0&&next.length<=4)onChange(next)}} aria-pressed={value.includes(day)}>{labels[day]}</button>)}</div>
-}
-
-function Today({program,workout,settings,logs,tr,onStart,onExercise}:{program?:Program;workout?:ProgramWorkout;settings:Settings;logs:WorkoutLog[];tr:(k:Parameters<typeof translate>[1])=>string;onStart:()=>void;onExercise:(id:string)=>void}){
-  if(!program||!workout)return null
-  const date=new Intl.DateTimeFormat(settings.language==='fi'?'fi-FI':'en-GB',{weekday:'long',day:'numeric',month:'long'}).format(new Date())
-  const last=logs.find(l=>l.finishedAt)
-  const bench=last?.exercises.find(e=>e.exerciseId==='bench-press')?.sets.filter(s=>s.completed).at(-1)
-  return <section className="page today-page"><p className="eyebrow">{date.toUpperCase()}</p><h1>{tr('today').toUpperCase()}</h1><article className="session-sheet"><div className="session-number">SESSION {String((program.workouts.findIndex(w=>w.id===workout.id)+1)).padStart(2,'0')}</div><h2>{workout.name.toUpperCase()}</h2><p>{workout.exercises.length} {tr('exercises')} · {workingSetCount(workout)} {tr('workingSets')} · {program.duration}</p><div className="exercise-stripes">{workout.exercises.map((pe,i)=>{const ex=findExercise(pe.exerciseId);return <button key={pe.exerciseId} onClick={()=>onExercise(pe.exerciseId)}><span>{String(i+1).padStart(2,'0')}</span>{ex?.name}<b>{pe.sets}×{pe.repMin}–{pe.repMax}</b></button>})}</div><button className="primary massive" onClick={onStart}>{tr('startWorkout').toUpperCase()}</button></article>{last&&<div className="last-block"><p className="eyebrow">{tr('lastSession').toUpperCase()}</p><strong>{last.workoutName}</strong>{bench&&<p>Bench Press · {roundWeight(displayWeight(bench.weightKg,settings.unit))} {settings.unit} × {bench.reps}</p>}</div>}</section>
-}
-
-function Programs({programs,activeId,tr,choose,newCustom,edit,remove}:{programs:Program[];activeId:string;tr:(k:Parameters<typeof translate>[1])=>string;choose:(id:string)=>void;newCustom:()=>void;edit:(p:Program)=>void;remove:(id:string)=>void}){
-  return <section className="page"><div className="page-title"><div><p className="eyebrow">TRAINING SYSTEM</p><h1>{tr('programs').toUpperCase()}</h1></div><button className="square-button" onClick={newCustom}>＋</button></div><div className="program-grid">{programs.slice().sort((a,b)=>Number(!!b.featured)-Number(!!a.featured)).map(p=><article key={p.id} className={`program-card ${p.featured?'featured':''} ${p.id===activeId?'active-program':''}`}>{p.featured&&<div className="stamp">FEATURED</div>}<p className="eyebrow">{p.daysPerWeek} DAYS · {p.duration}</p><h2>{p.name}</h2><p>{p.description}</p><div className="card-meta"><span>{p.focus}</span><span>{p.level}</span></div><div className="card-actions"><button className="primary" disabled={p.id===activeId} onClick={()=>choose(p.id)}>{p.id===activeId?'ACTIVE':tr('selectProgram')}</button>{p.custom&&<><button onClick={()=>edit(p)}>EDIT</button><button onClick={()=>remove(p.id)}>DELETE</button></>}</div></article>)}</div></section>
-}
-
-function History({logs,exercises,settings,tr,onExercise}:{logs:WorkoutLog[];exercises:Exercise[];settings:Settings;tr:(k:Parameters<typeof translate>[1])=>string;onExercise:(id:string)=>void}){
-  const completed=logs.filter(l=>l.finishedAt)
-  const exerciseBest=new Map<string,{set:LoggedSet;est:number}>()
-  completed.forEach(l=>l.exercises.forEach(e=>e.sets.filter(s=>s.completed&&!s.warmup).forEach(s=>{const est=epley(s.weightKg,s.reps);if(est>(exerciseBest.get(e.exerciseId)?.est??0))exerciseBest.set(e.exerciseId,{set:s,est})})))
-  return <section className="page"><p className="eyebrow">PROGRESS RECORD</p><h1>{tr('history').toUpperCase()}</h1><div className="stat-row"><div><strong>{completed.length}</strong><span>WORKOUTS</span></div><div><strong>{Math.round(completed.reduce((n,l)=>n+workoutVolume(l),0)).toLocaleString()}</strong><span>KG VOLUME</span></div><div><strong>{exerciseBest.size}</strong><span>EXERCISES</span></div></div><h2 className="section-title">EXERCISE RECORDS</h2><div className="record-list">{[...exerciseBest.entries()].sort((a,b)=>b[1].est-a[1].est).slice(0,12).map(([id,best])=><button key={id} onClick={()=>onExercise(id)}><span><b>{exercises.find(e=>e.id===id)?.name}</b><small>{tr('estimated1rm')} {roundWeight(displayWeight(best.est,settings.unit))} {settings.unit}</small></span><strong>{roundWeight(displayWeight(best.set.weightKg,settings.unit))} × {best.set.reps}</strong></button>)}</div>{completed.length===0&&<div className="empty-state"><h2>NO TRAINING HISTORY YET</h2><p>Finish your first workout and your strength progress will appear here.</p></div>}</section>
+  if(step===2)return <main className="onboarding"><p className="eyebrow">PROGRAM / 02</p><h1>{tr('choose')}</h1><article className="program-card featured"><div className="stamp">{tr('recommended')}</div><h2>{featured.name}</h2><p>{featured.daysPerWeek} DAYS / WEEK · {featured.duration}</p><p>{featured.description}</p><button className="primary" onClick={async()=>{await onSettings({activeProgramId:featured.id});setStep(3)}}>SELECT</button></article><button className="text-button" onClick={()=>onSettings({onboardingDone:true})}>Use another program later</button></main>
+  return <main className="onboarding"><p className="eyebrow">SCHEDULE / 03</p><h1>{tr('trainingDays')}</h1><DayPicker value={settings.trainingDays} onChange={(days)=>onSettings({trainingDays:days})} lang={settings.language}/><p className="muted">{tr('trainingDaysHelp')}</p><button className="primary massive" onClick={onDone}>{tr('startTraining')}</button></main>
 }
 
 function Profile({settings,tr,onSettings,onExport,onImport,onDelete}:{settings:Settings;tr:(k:Parameters<typeof translate>[1])=>string;onSettings:(p:Partial<Settings>)=>Promise<void>;onExport:()=>void;onImport:()=>void;onDelete:()=>void}){
@@ -265,9 +246,9 @@ function ExerciseDetail({exercise,history,settings,tr,onBack}:{exercise:Exercise
   return <section className="page exercise-detail"><button className="back-button" onClick={onBack}>← BACK</button><p className="eyebrow">EXERCISE RECORD</p><h1>{exercise.name.toUpperCase()}</h1><p className="muscle-copy">{exercise.primary.join(' · ')}</p><div className="exercise-detail-grid"><MuscleFigure primary={exercise.primary} secondary={exercise.secondary}/><div className="metric-stack"><div><small>{tr('best').toUpperCase()}</small><strong>{best?`${roundWeight(displayWeight(best.weightKg,settings.unit))} ${settings.unit} × ${best.reps}`:'—'}</strong></div><div><small>{tr('estimated1rm').toUpperCase()}</small><strong>{best?`${roundWeight(displayWeight(epley(best.weightKg,best.reps),settings.unit))} ${settings.unit}`:'—'}</strong></div><div><small>EQUIPMENT</small><strong>{exercise.equipment}</strong></div></div></div>{points.length>0&&<div className="mini-chart" aria-label={`Estimated 1RM history: ${points.map(p=>`${p.date} ${roundWeight(p.value)} kg`).join(', ')}`}><div className="chart-bars">{points.slice(-12).map((p,i)=>{const max=Math.max(...points.map(x=>x.value));return <i key={i} title={`${p.date}: ${roundWeight(p.value)} kg`} style={{height:`${Math.max(8,p.value/max*100)}%`}}/>})}</div><small>{tr('estimated1rm')} · last {Math.min(points.length,12)} sessions</small></div>}<div className="instruction-block"><h2>{tr('how').toUpperCase()}</h2><ol>{exercise.instructions.map((x,i)=><li key={i}>{x}</li>)}</ol><h2>{tr('mistakes').toUpperCase()}</h2><ul>{exercise.mistakes.map((x,i)=><li key={i}>{x}</li>)}</ul></div></section>
 }
 
-function Summary({log,previous,settings,exercises,tr,onDone}:{log:WorkoutLog;previous:WorkoutLog[];settings:Settings;exercises:Exercise[];tr:(k:Parameters<typeof translate>[1])=>string;onDone:()=>void}){
+function Summary({log,previous,settings,exercises,tr,onDone,onHistory}:{log:WorkoutLog;previous:WorkoutLog[];settings:Settings;exercises:Exercise[];tr:(k:Parameters<typeof translate>[1])=>string;onDone:()=>void;onHistory:()=>void}){
   const prs=log.exercises.map(e=>({id:e.exerciseId,...detectNewPr(previous,e.exerciseId,e.sets)})).filter(x=>x.isPr)
-  return <section className="summary-page"><p className="eyebrow">SESSION COMPLETE</p><h1>{tr('complete').toUpperCase()}</h1><div className="summary-metrics"><div><strong>{Math.round((log.durationSeconds??0)/60)}</strong><span>MIN</span></div><div><strong>{log.exercises.reduce((n,e)=>n+e.sets.filter(s=>s.completed&&!s.warmup).length,0)}</strong><span>SETS</span></div><div><strong>{Math.round(workoutVolume(log)).toLocaleString()}</strong><span>KG</span></div></div>{prs.length>0&&<div className="pr-card"><small>NEW ESTIMATED 1RM</small><h2>{exercises.find(e=>e.id===prs[0]!.id)?.name}</h2><strong>{roundWeight(displayWeight(prs[0]!.newBest,settings.unit))} {settings.unit}</strong></div>}<div className="summary-exercises">{log.exercises.map(e=><div key={e.exerciseId}><b>{exercises.find(x=>x.id===e.exerciseId)?.name}</b><span>{e.sets.filter(s=>s.completed).map(s=>`${roundWeight(displayWeight(s.weightKg,settings.unit))}×${s.reps}`).join(' · ') || 'Skipped'}</span></div>)}</div><button className="primary massive" onClick={onDone}>{tr('done').toUpperCase()}</button></section>
+  return <section className="summary-page"><p className="eyebrow">SESSION COMPLETE</p><h1>{tr('complete').toUpperCase()}</h1><div className="summary-metrics"><div><strong>{Math.round((log.durationSeconds??0)/60)}</strong><span>MIN</span></div><div><strong>{log.exercises.reduce((n,e)=>n+e.sets.filter(s=>s.completed&&!s.warmup).length,0)}</strong><span>SETS</span></div><div><strong>{Math.round(workoutVolume(log)).toLocaleString()}</strong><span>KG</span></div></div>{prs.length>0&&<div className="pr-card"><small>NEW ESTIMATED 1RM</small><h2>{exercises.find(e=>e.id===prs[0]!.id)?.name}</h2><strong>{roundWeight(displayWeight(prs[0]!.newBest,settings.unit))} {settings.unit}</strong></div>}<div className="summary-exercises">{log.exercises.map(e=><div key={e.exerciseId}><b>{exercises.find(x=>x.id===e.exerciseId)?.name}</b><span>{e.sets.filter(s=>s.completed).map(s=>`${roundWeight(displayWeight(s.weightKg,settings.unit))}×${s.reps}`).join(' · ') || 'Skipped'}</span></div>)}</div><button className="primary massive" onClick={onDone}>{tr('done').toUpperCase()}</button><button className="text-button" onClick={onHistory}>{tr('viewHistory')} →</button></section>
 }
 
 function CustomProgram({draft,setDraft,exercises,tr,onSave,onCancel}:{draft:Program;setDraft:(p:Program)=>void;exercises:Exercise[];tr:(k:Parameters<typeof translate>[1])=>string;onSave:()=>void;onCancel:()=>void}){

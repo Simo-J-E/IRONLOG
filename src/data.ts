@@ -78,11 +78,11 @@ const pe = (exerciseId: string, sets: number, repMin: number, repMax: number, re
 
 export const programs: Program[] = [
   {
-    id:'chest-arms', name:'Chest + Arms Growth', description:'High-intensity hypertrophy with progressive overload.', daysPerWeek:3, duration:'50–65 min', focus:'Chest + Arms', level:'Intermediate', featured:true,
+    id:'chest-arms', name:'Chest, Back + Arms', description:'Three upper-body sessions with chest, back, biceps and triceps throughout the week.', daysPerWeek:3, duration:'50–65 min', focus:'Chest + Back + Arms', level:'Intermediate', featured:true, revision:2,
     workouts:[
-      { id:'ca-a', name:'Chest + Triceps', exercises:[pe('bench-press',4,6,8,180),pe('incline-db',3,8,10,120),pe('cable-fly',3,10,12,75),pe('pushdown',3,8,12,75),pe('overhead-triceps',3,10,12,75)]},
-      { id:'ca-b', name:'Arms + Chest', exercises:[pe('close-grip-bench',3,6,8,150),pe('barbell-curl',3,6,10,90),pe('incline-curl',3,8,12,75),pe('hammer-curl',3,8,12,75),pe('chest-press',3,8,10,120),pe('cable-triceps',3,10,12,75)]},
-      { id:'ca-c', name:'Heavy Chest + Arms', exercises:[pe('bench-press',4,5,7,180),pe('incline-bench',3,6,10,120),pe('pec-deck',3,10,12,75),pe('ez-curl',3,8,10,90),pe('preacher-curl',2,10,12,75),pe('skull-crushers',3,8,12,90)]}
+      { id:'ca-a', name:'Upper A · Chest + Back', exercises:[pe('bench-press',3,6,10,150),pe('seated-row',3,8,12,120),pe('incline-db',2,8,12,120),pe('db-curl',3,8,12,75),pe('pushdown',3,10,15,75),pe('lateral-raise',2,12,15,60)]},
+      { id:'ca-b', name:'Upper B · Back + Arms', exercises:[pe('lat-pulldown',3,8,12,120),pe('chest-press',3,8,12,120),pe('chest-supported-row',2,8,12,120),pe('hammer-curl',3,8,12,75),pe('overhead-triceps',3,10,15,75),pe('rear-delt-fly',2,12,15,60)]},
+      { id:'ca-c', name:'Upper C · Chest + Arms', exercises:[pe('incline-db',3,8,12,120),pe('seated-row',3,8,12,120),pe('cable-fly',2,10,15,75),pe('lat-pulldown',2,8,12,120),pe('ez-curl',2,8,12,75),pe('pushdown',2,10,15,75)]}
     ]
   },
   { id:'beginner-full',name:'Beginner Full Body',description:'Simple whole-body base.',daysPerWeek:3,duration:'45–60 min',focus:'Full body',level:'Beginner',workouts:[{id:'bf-a',name:'Full Body A',exercises:[pe('squat',3,8,10,150),pe('bench-press',3,8,10,150),pe('lat-pulldown',3,8,12,120),pe('db-curl',2,10,12,75),pe('pushdown',2,10,12,75)]},{id:'bf-b',name:'Full Body B',exercises:[pe('leg-press',3,10,12,150),pe('overhead-press',3,8,10,120),pe('seated-row',3,8,12,120),pe('rdl',3,8,10,150),pe('plank',3,30,45,60)]}]},

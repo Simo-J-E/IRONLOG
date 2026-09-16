@@ -43,6 +43,7 @@ export interface Program {
   featured?: boolean
   custom?: boolean
   workouts: ProgramWorkout[]
+  revision?: number
 }
 
 export interface LoggedSet {
@@ -103,4 +104,5 @@ export interface Settings {
   activeProgramId: string
   trainingDays: number[]
   autoRest: boolean
+  scheduleStartDate?: string
 }

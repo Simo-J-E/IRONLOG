@@ -1,6 +1,6 @@
 # IRONLOG
 
-Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. The existing training programs and visual style are retained.
+Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. Includes a workout calendar, complete session history and a three-day chest, back and arms plan.
 
 ## Start locally
 
@@ -22,7 +22,32 @@ npm start
 
 Open `http://localhost:3001`. Keep using the same browser and website address: browser data is separate for each origin.
 
-## What changed
+## Calendar and workout history (2.1)
+
+- **Today** shows the selected plan, next scheduled workout with all exercises, and the next three training dates. Tap a date to open it in the calendar.
+- **Programs** opens the selected plan in full. Each session lists its exercises, primary muscles, sets, rep targets and rest times. Other programs can be previewed before selection.
+- **Calendar** shows a month at a time. Tap a day or use **Go to date** to see exactly what is scheduled, including future Wednesdays. A/B/C refer to the sessions in the legend. Completed and unfinished workouts are marked separately.
+- Open **Training days** in the calendar to change weekdays. Monday/Wednesday/Friday is the default. Days always use Monday-to-Sunday order, regardless of the order you tapped them.
+- Workouts rotate continuously across the chosen days. For example, a two-session A/B plan on three weekly days alternates A/B/A then B/A/B. Missing a workout does not shift future dates.
+- Changing the plan or weekdays restarts the rotation from Monday of the current week, with planned dates shown from the day of the change onward. Old completed and unfinished records remain visible on their actual training dates. Earlier planned schedules are not archived.
+- On rest days, Today previews the next scheduled session. Starting it early, or doing a missed session from the calendar, records it on the date you actually train. It does not mark a future date complete. Future dates in the calendar are previews.
+- **History** now lists every saved session, newest first, including unfinished sessions. Expand one to see the date, duration, exercises, every set's weight/reps, warm-ups, completion status and notes. Search by workout/exercise name or filter by dates. Only completed working sets contribute to volume. Units follow your profile.
+- **Finish → View history** opens your completed workout log directly. **Save & exit** leaves a session unfinished; use **Resume workout** to continue.
+- Existing browser data upgrades in place. The previous built-in Chest + Arms Growth plan becomes **Chest, Back + Arms**. Custom plans, saved sessions and active workout snapshots are preserved. Other selected plans remain selected.
+
+### Recommended plan
+
+Default schedule, about 50–65 minutes per session:
+
+| Day | Session | Exercises (sets × reps) |
+| --- | --- | --- |
+| Monday | Upper A · Chest + Back | Bench press 3×6–10; seated row 3×8–12; incline dumbbell press 2×8–12; dumbbell curl 3×8–12; pushdown 3×10–15; lateral raise 2×12–15 |
+| Wednesday | Upper B · Back + Arms | Lat pulldown 3×8–12; chest press 3×8–12; chest supported row 2×8–12; hammer curl 3×8–12; overhead triceps extension 3×10–15; rear delt fly 2×12–15 |
+| Friday | Upper C · Chest + Arms | Incline dumbbell press 3×8–12; seated row 3×8–12; cable fly 2×10–15; lat pulldown 2×8–12; EZ-bar curl 2×8–12; pushdown 2×10–15 |
+
+Warm up before working sets. Choose weights you can control, leave about 1–2 reps in reserve, and increase the weight gradually when you reach the top of the rep range with good form. This is the requested upper-body routine. Exact exercises and sets are an app template, not an ACSM-prescribed routine. General programming reference: [ACSM resistance training guidance (2026)](https://acsm.org/resistance-training-guidelines-update-2026/).
+
+## Existing workout saving and accounts
 
 - Each input is saved immediately. A synchronous recovery journal protects changes while IndexedDB writes are still pending.
 - Reopening automatically resumes the unfinished workout, exercise position, weights, reps, completed sets and partially typed numbers.
@@ -105,7 +130,7 @@ npm run check
 
 This runs lint, TypeScript, storage/recovery/sync and React regression tests, real HTTP + SQLite backend tests, and the production build. The backend tests cover authentication, origin checks, account separation, retries, ranking calculations, conflict rejection, atomic invalid-batch rejection, deletion, and restart persistence. Tests use temporary databases.
 
-The existing mobile Playwright smoke test remains available:
+The Playwright tests cover onboarding, mobile logging, calendar previews, changing weekdays, plan selection, history after reload, and narrow/desktop layouts:
 
 ```bash
 npx playwright install chromium
