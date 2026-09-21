@@ -24,6 +24,7 @@ export const timestamp = () => new Date(lastTimestamp = Math.max(Date.now(), las
 export const changed = () => window.dispatchEvent(new Event('ironlog-local-change'))
 export const table = (store: IronlogDB, c: Collection) => store.table<StoredRecord, string>(c)
 const checkpointKey = (store: IronlogDB) => `ironlog:recovery:${store.name}`
+const pendingSettingsKey = (store: IronlogDB) => `ironlog:pending-settings:${store.name}`
 
 export async function switchDatabase(accountId?: string) {
   await flushWrites()
@@ -34,6 +35,12 @@ export async function switchDatabase(accountId?: string) {
 }
 export async function seedDatabase(store = db) {
   await store.open()
+  let pendingSettings: Settings | undefined
+  try {
+    const raw = localStorage.getItem(pendingSettingsKey(store))
+    const parsed: unknown = raw ? JSON.parse(raw) : undefined
+    if (parsed && validateRecord('settings', parsed)) pendingSettings = parsed
+  } catch { /* IndexedDB remains the source of truth when recovery data is unavailable. */ }
   await store.transaction('rw', store.programs, store.exercises, store.settings, async () => {
     for (const p of programs) {
       const saved = await store.programs.get(p.id)
@@ -41,9 +48,16 @@ export async function seedDatabase(store = db) {
     }
     for (const e of exercises) if (!await store.exercises.get(e.id)) await store.exercises.put(e)
     const settings = await store.settings.get('settings')
-    if (!settings) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 3, 5], autoRest: true, scheduleStartDate: localDateKey(new Date()) })
+    if (pendingSettings) await store.settings.put(pendingSettings)
+    else if (!settings) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 3, 5], autoRest: true, scheduleStartDate: localDateKey(new Date()) })
     else if (!settings.scheduleStartDate) await store.settings.put({ ...settings, scheduleStartDate: localDateKey(new Date()) })
   })
+  if (pendingSettings) {
+    try {
+      const raw = localStorage.getItem(pendingSettingsKey(store))
+      if (raw === JSON.stringify(pendingSettings)) localStorage.removeItem(pendingSettingsKey(store))
+    } catch { /* Recovery data can be retried on the next start. */ }
+  }
 }
 async function write(store: IronlogDB, collection: Collection, data: StoredRecord | null, id: string) {
   await store.transaction('rw', table(store, collection), store.sync, async () => {
@@ -58,7 +72,16 @@ async function write(store: IronlogDB, collection: Collection, data: StoredRecor
 export function putRecord(collection: Collection, data: StoredRecord, store = db) {
   const snapshot = structuredClone(data)
   if (!validateRecord(collection, snapshot)) return Promise.reject(new Error('Please check the entered values. They could not be saved.'))
-  const job = writeQueue.then(() => write(store, collection, snapshot, snapshot.id))
+  const recovery = collection === 'settings' ? JSON.stringify(snapshot) : undefined
+  if (recovery) {
+    try { localStorage.setItem(pendingSettingsKey(store), recovery) } catch { /* IndexedDB may still save normally. */ }
+  }
+  const job = writeQueue.then(() => write(store, collection, snapshot, snapshot.id)).then(result => {
+    if (recovery) {
+      try { if (localStorage.getItem(pendingSettingsKey(store)) === recovery) localStorage.removeItem(pendingSettingsKey(store)) } catch { /* A stale recovery copy is harmless and validated on boot. */ }
+    }
+    return result
+  })
   writeQueue = job.catch(() => undefined)
   return job
 }
