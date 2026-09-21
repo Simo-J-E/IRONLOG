@@ -1,4 +1,4 @@
-import type { Collection, StoredRecord } from './types'
+import type { Collection, RecordByCollection, StoredRecord } from './types'
 
 export const collections: Collection[] = ['workouts', 'programs', 'exercises', 'settings']
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -12,7 +12,7 @@ const optional = (v: unknown, check: (v: unknown) => boolean) => v === undefined
 const plan = (v: unknown) => object(v) && str(v.id) && str(v.name) && Array.isArray(v.exercises) && v.exercises.length > 0 && v.exercises.length <= 100 && v.exercises.every(e => object(e) && str(e.exerciseId) && integer(e.sets, 100, 1) && integer(e.repMin, 1000, 1) && integer(e.repMax, 1000, 1) && Number(e.repMin) <= Number(e.repMax) && integer(e.restSeconds, 3600))
 
 /** Used by both backup imports and authenticated API writes. */
-export function validateRecord(collection: Collection, value: unknown): value is StoredRecord {
+export function validateRecord<C extends Collection>(collection: C, value: unknown): value is RecordByCollection[C] {
   if (!object(value) || !str(value.id)) return false
   const v = value
   if (collection === 'settings') return v.id === 'settings' && ['en', 'fi'].includes(String(v.language)) && ['kg', 'lb'].includes(String(v.unit)) && typeof v.onboardingDone === 'boolean' && typeof v.autoRest === 'boolean' && str(v.activeProgramId) && Array.isArray(v.trainingDays) && v.trainingDays.length > 0 && v.trainingDays.length <= 7 && v.trainingDays.every(d => integer(d, 6)) && new Set(v.trainingDays).size === v.trainingDays.length && optional(v.scheduleStartDate, calendarDate)

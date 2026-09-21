@@ -8,6 +8,29 @@ const log = (): WorkoutLog => ({ id: 'workout-1', programId: 'chest-arms', worko
 beforeEach(async () => { await switchDatabase(); await db.delete(); localStorage.clear(); await switchDatabase() })
 afterEach(async () => { vi.restoreAllMocks(); await flushWrites(); await db.delete() })
 
+describe('settings recovery', () => {
+  it('restores validated pending settings after reopening the database', async () => {
+    const settings = (await db.settings.get('settings'))!
+    const pending = { ...settings, activeProgramId: 'beginner-full', trainingDays: [0, 2, 4] }
+    localStorage.setItem('ironlog:pending-settings:ironlog', JSON.stringify(pending))
+    db.close()
+    await switchDatabase()
+    expect(await db.settings.get('settings')).toEqual(pending)
+    expect(localStorage.getItem('ironlog:pending-settings:ironlog')).toBeNull()
+  })
+  it.each([
+    ['malformed JSON', '{'],
+    ['incomplete settings', JSON.stringify({ id: 'settings', language: 'en' })],
+    ['a record from another collection', JSON.stringify(log())],
+  ])('preserves saved settings when pending recovery contains %s', async (_label, raw) => {
+    const settings = await db.settings.get('settings')
+    localStorage.setItem('ironlog:pending-settings:ironlog', raw)
+    db.close()
+    await switchDatabase()
+    expect(await db.settings.get('settings')).toEqual(settings)
+  })
+})
+
 describe('workout durability', () => {
   it('writes the recovery copy synchronously and restores position, partial input and the timer after reopening', async () => {
     const draft = log()

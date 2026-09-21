@@ -77,8 +77,14 @@ export interface WorkoutLog {
   progress?: { exerciseIndex: number; restEndsAt: number | null }
 }
 
-export type Collection = 'workouts' | 'programs' | 'exercises' | 'settings'
-export type StoredRecord = WorkoutLog | Program | Exercise | Settings
+export interface RecordByCollection {
+  workouts: WorkoutLog
+  programs: Program
+  exercises: Exercise
+  settings: Settings
+}
+export type Collection = keyof RecordByCollection
+export type StoredRecord = RecordByCollection[Collection]
 export interface RemoteRecord {
   collection: Collection
   id: string
