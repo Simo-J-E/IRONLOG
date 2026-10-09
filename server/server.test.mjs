@@ -58,7 +58,7 @@ test('retries do not double count rankings, and only completed working sets qual
   assert.equal((await alice.request('/rankings')).body.me.points, 0)
 })
 test('account records are isolated and ranking participation is optional', async () => {
-  const alice = client(), bob = client(); await alice.register('alice', true); await bob.register('bob')
+  const alice = client(), bob = client(); await alice.register('alice', true); await bob.register('bobby')
   await alice.sync([change(workout())])
   assert.deepEqual((await bob.sync()).body.records, [])
   assert.equal((await bob.request('/sync', 'POST', { accountId: alice.user.id, cursor: 0, changes: [] })).status, 409)
@@ -118,4 +118,19 @@ test('automatic backup snapshot contains committed workouts and trims old snapsh
   assert.equal(readdirSync(snapshotDir).filter(name => name.endsWith('.sqlite')).length, 2)
   // Cloud DB mutations never depend on or wait for backups.
   assert.equal((await alice.sync()).status, 200)
+})
+
+
+test('username validation accepts slash, requires 4 characters to register, and allows older accounts to log in', async () => {
+  const person = client()
+  const password = 'Long unique test password!'
+  let res = await person.request('/auth/register', 'POST', { username: 'abc', password })
+  assert.equal(res.status, 400)
+  res = await person.register('AB/C')
+  assert.equal(res.body.user.username, 'ab/c')
+  res = await client().request('/auth/login', 'POST', { username: 'ab/c', password })
+  assert.equal(res.status, 200)
+  app.db.prepare('UPDATE users SET username=? WHERE username=?').run('abc', 'ab/c')
+  res = await client().request('/auth/login', 'POST', { username: 'abc', password })
+  assert.equal(res.status, 200)
 })

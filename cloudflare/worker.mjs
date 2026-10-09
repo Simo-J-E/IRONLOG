@@ -73,7 +73,9 @@ async function handle(req, env) {
   if (['/api/auth/register', '/api/auth/login'].includes(pathname) && method === 'POST') {
     await limit(env.DB, `auth:${ip}`, 20, 15 * 60_000)
     const input = await body(req, 4096)
-    if (typeof input.username !== 'string' || !/^[a-zA-Z0-9_]{3,24}$/.test(input.username) || !passwordValid(input.password)) throw fail(400, 'Use a 3–24 character username and a 12–128 character password.')
+    const registering = pathname === '/api/auth/register'
+    const usernamePattern = registering ? /^[a-zA-Z0-9_\/]{4,24}$/ : /^[a-zA-Z0-9_\/]{3,24}$/
+    if (typeof input.username !== 'string' || !usernamePattern.test(input.username) || !passwordValid(input.password)) throw fail(400, registering ? 'Use a 4–24 character username (letters, numbers, _ or /) and a 12–128 character password.' : 'Invalid username or password format.')
     const username = input.username.toLowerCase()
     let user = await env.DB.prepare('SELECT * FROM users WHERE username=?').bind(username).first()
     if (pathname.endsWith('/register')) {

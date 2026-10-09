@@ -46,9 +46,9 @@ export function AccountPanel({ account, status, onAuthenticate, onLogout, onAcco
     </> : <form onSubmit={e => { e.preventDefault(); void act(async () => { await onAuthenticate({ username, password, ranked, importGuest, register: register && !account }); setPassword(''); setReauth(false) }) }}>
       <p>Training saves on your device. Sign in to sync it between devices.</p>
       {!account && <div className="account-actions"><button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>Sign in</button><button type="button" aria-pressed={register} onClick={() => setRegister(true)}>Create account</button></div>}
-      <label className="field-label">Username<input autoComplete="username" required pattern="[A-Za-z0-9_]{3,24}" minLength={3} maxLength={24} value={username} onChange={e => setUsername(e.target.value)} spellCheck={false} autoCapitalize="none"/></label>
+      <label className="field-label">Username<input autoComplete="username" required pattern={register ? '[A-Za-z0-9_\\/]{4,24}' : '[A-Za-z0-9_\\/]{3,24}'} minLength={register ? 4 : 3} maxLength={24} value={username} onChange={e => setUsername(e.target.value)} spellCheck={false} autoCapitalize="none"/></label>
       <label className="field-label">Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)}/></label>
-      {register && <p className="muted">Use at least 12 characters. Save your password: email recovery is not available.</p>}
+      {register && <p className="muted">Username: 4–24 characters. Letters, numbers, _ and / allowed. Password: at least 12 characters. Save your password: email recovery is not available.</p>}
       {!account && <label className="check-field"><input type="checkbox" checked={importGuest} onChange={e => setImportGuest(e.target.checked)}/><span>Copy my guest workouts and programs into this account</span></label>}
       {register && <label className="check-field"><input type="checkbox" checked={ranked} onChange={e => setRanked(e.target.checked)}/><span>Join rankings with my username and training totals</span></label>}
       <button className="primary" disabled={busy}>{busy ? 'Connecting…' : register && !account ? 'Create account' : 'Sign in'}</button>

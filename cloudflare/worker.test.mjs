@@ -96,3 +96,31 @@ test('Cloudflare API: sessions and workout data round-trip', async () => {
     assert.equal((await res.json()).user, null)
   } finally { db.close() }
 })
+
+
+test('Cloudflare username rules: 4-character minimum, / allowed, and legacy 3-character logins', async () => {
+  const db = d1()
+  const env = { DB: db, ALLOWED_ORIGIN: 'https://lifter.github.io' }
+  const password = 'password-that-is-long-enough'
+  try {
+    let res = await call(env, '/api/auth/register', 'POST', { username: 'abc', password })
+    assert.equal(res.status, 400)
+    assert.match((await res.json()).error, /4–24/)
+
+    res = await call(env, '/api/auth/register', 'POST', { username: 'AB/C', password })
+    assert.equal(res.status, 200, await res.clone().text())
+    assert.equal((await res.json()).user.username, 'ab/c')
+
+    res = await call(env, '/api/auth/login', 'POST', { username: 'ab/c', password })
+    assert.equal(res.status, 200)
+
+    res = await call(env, '/api/auth/register', 'POST', { username: 'ab c', password })
+    assert.equal(res.status, 400)
+
+    // Accounts created before the four-character rule may still have three letters.
+    await db.prepare('UPDATE users SET username=? WHERE username=?').bind('abc', 'ab/c').run()
+    res = await call(env, '/api/auth/login', 'POST', { username: 'abc', password })
+    assert.equal(res.status, 200)
+    assert.equal((await res.json()).user.username, 'abc')
+  } finally { db.close() }
+})

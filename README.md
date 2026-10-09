@@ -73,7 +73,7 @@ Warm up before working sets. Choose weights you can control, leave about 1–2 r
 
 ## Rankings
 
-Participation is optional. Enable it when creating an account or in Profile. The leaderboard shows usernames, workout counts and points, and updates after sync.
+Participation is optional. Enable it when creating an account or in Profile. The leaderboard shows usernames, workout counts and points, and updates after sync. New usernames are 4–24 characters and may contain letters, numbers, `_` and `/`. Existing three-character account names can still sign in.
 
 - 100 points for a finished workout containing at least one completed working set.
 - 10 additional points per completed working set, up to 30 sets per workout.
