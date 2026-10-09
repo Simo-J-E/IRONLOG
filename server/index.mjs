@@ -6,6 +6,7 @@ import { mkdirSync, statSync, readFileSync } from 'node:fs'
 import { dirname, resolve, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collections, validateRecord } from '../src/validation.ts'
+import { snapshotDatabase } from './backups.mjs'
 
 const derive = promisify(scrypt)
 const sha = value => createHash('sha256').update(value).digest('hex')
@@ -21,7 +22,7 @@ async function passwordHash(password, salt) {
   try { return await derive(password, salt, 64, SCRYPT) } finally { hashing-- }
 }
 
-export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'), publicOrigin = '', production = false, staticDir = resolve(ROOT, 'dist'), authLimit = 20 } = {}) {
+export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'), publicOrigin = '', production = false, staticDir = resolve(ROOT, 'dist'), authLimit = 20, backupDirectory = null, backupIntervalMs = production ? 6 * 3600000 : 0, backupKeep = 28 } = {}) {
   if (production && (!publicOrigin || new URL(publicOrigin).protocol !== 'https:')) throw new Error('Set PUBLIC_ORIGIN to your HTTPS website URL in production.')
   if (publicOrigin && new URL(publicOrigin).origin !== publicOrigin) throw new Error('PUBLIC_ORIGIN must be an origin without a trailing slash or path.')
   if (databasePath !== ':memory:') mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
@@ -35,6 +36,20 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
     INSERT OR IGNORE INTO sequence_counter VALUES(1,0);
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, hits INTEGER NOT NULL, reset_at INTEGER NOT NULL);
     PRAGMA user_version=1;`)
+  // In production, save snapshots on the same persistent disk as SQLite.
+  // Keep copies OFF this machine too: a failed disk destroys both the DB and snapshots.
+  const snapshots = backupDirectory ?? resolve(dirname(databasePath), 'backups')
+  let backupInFlight = null
+  const backupNow = () => {
+    if (!backupInFlight) backupInFlight = snapshotDatabase(db, snapshots, backupKeep).finally(() => { backupInFlight = null })
+    return backupInFlight
+  }
+  const onBackupError = error => console.error('IRONLOG database backup failed:', error)
+  const interval = backupIntervalMs > 0 && databasePath !== ':memory:' ? setInterval(() => { void backupNow().catch(onBackupError) }, backupIntervalMs) : null
+  // Also take an early backup after startup, even when the server is restarted often.
+  const initialBackup = backupIntervalMs > 0 && databasePath !== ':memory:' ? setTimeout(() => { void backupNow().catch(onBackupError) }, Math.min(10 * 60000, backupIntervalMs)) : null
+  interval?.unref()
+  initialBackup?.unref()
   const cookieName = production ? '__Host-ironlog' : 'ironlog_session'
   const cookie = (token, age) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${production ? '; Secure' : ''}`
   function limit(key, maximum, windowMs) {
@@ -96,7 +111,7 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
         const expected = publicOrigin || `http://${req.headers.host}`
         if (req.headers['x-ironlog-client'] !== '1' || req.headers.origin !== expected) throw fail(403, 'Request origin is not allowed.')
       }
-      if (pathname === '/api/health' && req.method === 'GET') return json(res, 200, { service: 'ironlog', version: 2 })
+      if (pathname === '/api/health' && req.method === 'GET') { db.prepare('SELECT 1').get(); return json(res, 200, { service: 'ironlog', version: 2, database: 'ok' }) }
       if (pathname === '/api/auth/me' && req.method === 'GET') { const signedIn = getUser(req); return json(res, 200, { user: signedIn ? publicUser(signedIn) : null }) }
       if (['/api/auth/register', '/api/auth/login'].includes(pathname) && req.method === 'POST') {
         limit(`auth:${ip}`, authLimit, 15 * 60000)
@@ -184,11 +199,20 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
   })
   server.requestTimeout = 30000
   server.headersTimeout = 10000
-  return { server, db, close: () => new Promise(resolveClose => server.close(() => { db.close(); resolveClose() })) }
+  return { server, db, backupNow, close: async () => {
+    if (interval) clearInterval(interval)
+    if (initialBackup) clearTimeout(initialBackup)
+    await new Promise(resolveClose => server.close(resolveClose))
+    if (backupInFlight) await backupInFlight
+    db.close()
+  } }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const app = createApp({ databasePath: process.env.DATABASE_PATH || undefined, publicOrigin: process.env.PUBLIC_ORIGIN || '', production: process.env.NODE_ENV === 'production' })
+  const hours = Number(process.env.BACKUP_INTERVAL_HOURS ?? '6')
+  const keep = Number(process.env.BACKUP_KEEP ?? '28')
+  if (!Number.isFinite(hours) || hours < 0 || hours > 168 || !Number.isSafeInteger(keep) || keep < 1 || keep > 365) throw new Error('Invalid backup settings.')
+  const app = createApp({ databasePath: process.env.DATABASE_PATH || undefined, publicOrigin: process.env.PUBLIC_ORIGIN || '', production: process.env.NODE_ENV === 'production', backupIntervalMs: process.env.NODE_ENV === 'production' ? hours * 3600000 : 0, backupKeep: keep })
   const port = Number(process.env.PORT || 3001)
   app.server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`IRONLOG listening on port ${port}`))
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await app.close(); process.exit(0) })

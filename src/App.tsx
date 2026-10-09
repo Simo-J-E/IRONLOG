@@ -5,7 +5,7 @@ import { detectNewPr, displayWeight, epley, inputToKg, roundWeight, workoutVolum
 import { translate } from './i18n'
 import { MuscleFigure } from './MuscleFigure'
 import { AccountPanel, type Credentials } from './AccountPanel'
-import { api, cacheAccount, cachedAccount } from './account'
+import { api, cacheAccount, cachedAccount, saveSessionToken } from './account'
 import { localStatus, syncAccount, waitForSync, type SyncStatus } from './sync'
 import type { Account, Exercise, Language, LoggedSet, Program, ProgramWorkout, Settings, Unit, WorkoutLog } from './types'
 import { Calendar, DayPicker, History, Programs, Today } from './TrainingViews'
@@ -184,15 +184,16 @@ export default function App() {
   async function authenticate(input:Credentials){
     await waitForSync();await flushWrites()
     const guestBackup=input.importGuest&&db.name==='ironlog'?await exportAllData(activeRef.current):null
-    const result=await api<{user:Account}>(input.register?'/auth/register':'/auth/login','POST',{username:input.username,password:input.password,ranked:input.ranked})
+    const result=await api<{user:Account;token?:string}>(input.register?'/auth/register':'/auth/login','POST',{username:input.username,password:input.password,ranked:input.ranked})
+    if (result.token) saveSessionToken(result.token)
     await changeIdentity(result.user,guestBackup);void requestPersistentStorage()
   }
   async function logout(){
-    await waitForSync();await flushWrites();await api('/auth/logout','POST',{})
+    await waitForSync();await flushWrites();await api('/auth/logout','POST',{});saveSessionToken(null)
     await changeIdentity(null);setView('today')
   }
   async function deleteAccount(password:string){
-    await waitForSync();await api('/account','DELETE',{password})
+    await waitForSync();await api('/account','DELETE',{password});saveSessionToken(null)
     await changeIdentity(null,null,true);setView('today')
   }
   const syncNow=async()=>{if(account)await syncAccount(account,setSyncStatus)}

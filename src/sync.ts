@@ -34,7 +34,7 @@ async function performSync(account: Account, report: (status: SyncStatus) => voi
     for (let pass = 0; more && pass < 20; pass++) {
       if (store !== db) return
       const changes = await store.transaction('r', [...collections.map(c => table(store, c)), store.sync], async () => {
-        const dirty = (await store.sync.where('dirty').equals(1).toArray()).filter(s => !s.conflict).slice(0, 25)
+        const dirty = (await store.sync.where('dirty').equals(1).toArray()).filter(s => !s.conflict).slice(0, 10)
         return Promise.all(dirty.map(async s => ({ collection: s.collection, id: s.id, revision: s.revision, mutationId: s.mutationId, data: await table(store, s.collection).get(s.id) ?? null })))
       })
       const cursor = Number((await store.meta.get('cursor'))?.value ?? 0)

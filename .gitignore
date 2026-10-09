@@ -10,3 +10,8 @@ test-results/
 *.sqlite-shm
 *.sqlite-wal
 backups/
+
+# Local Cloudflare dev state and any exported private database backups
+.wrangler/
+*.sql.bak
+ironlog-backup*.sql

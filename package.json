@@ -15,7 +15,8 @@
     "dev:server": "node --watch server/index.mjs",
     "start": "node server/index.mjs",
     "test:server": "node --test server/*.test.mjs",
-    "check": "npm run lint && npm run typecheck && npm test && npm run test:server && npm run build",
+    "test:cloudflare": "node --experimental-strip-types --test cloudflare/worker.test.mjs",
+    "check": "npm run lint && npm run typecheck && npm test && npm run test:server && npm run test:cloudflare && npm run build",
     "backup": "node scripts/backup.mjs"
   },
   "dependencies": {

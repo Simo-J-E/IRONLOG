@@ -1,0 +1,4 @@
+{$IRONLOG_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy ironlog:3001
+}

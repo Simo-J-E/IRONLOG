@@ -1,0 +1,6 @@
+name = "ironlog-api"
+main = "worker.mjs"
+compatibility_date = "2026-10-09"
+
+[vars]
+ALLOWED_ORIGIN = "https://simo-j-e.github.io,http://localhost:5173"

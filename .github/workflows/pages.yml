@@ -44,7 +44,12 @@ jobs:
       - name: Backend tests
         run: npm run test:server
 
+      - name: Cloudflare backend tests
+        run: npm run test:cloudflare
+
       - name: Build
+        env:
+          VITE_API_URL: ${{ vars.IRONLOG_API_URL }}
         run: npm run build
 
       - name: Install Playwright Chromium

@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE COLLATE NOCASE NOT NULL,
+  salt TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  ranked INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS records (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  collection TEXT NOT NULL,
+  id TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  mutation_id TEXT NOT NULL,
+  data TEXT,
+  sequence INTEGER NOT NULL,
+  score INTEGER NOT NULL DEFAULT 0,
+  workout_count INTEGER NOT NULL DEFAULT 0,
+  working_sets INTEGER NOT NULL DEFAULT 0,
+  bench REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, collection, id)
+);
+CREATE INDEX IF NOT EXISTS records_pull ON records(user_id, sequence);
+CREATE TABLE IF NOT EXISTS sequence_counter (id INTEGER PRIMARY KEY CHECK(id=1), value INTEGER NOT NULL);
+INSERT OR IGNORE INTO sequence_counter VALUES(1,0);
+CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, hits INTEGER NOT NULL, reset_at INTEGER NOT NULL);

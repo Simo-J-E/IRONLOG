@@ -1,0 +1,21 @@
+# Optional HTTPS ingress on a publicly reachable computer/VPS.
+# Use this only if ports 80/443 are not already used by another web server.
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      IRONLOG_DOMAIN: ${IRONLOG_DOMAIN:?Set IRONLOG_DOMAIN to your DNS hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      ironlog:
+        condition: service_healthy
+volumes:
+  caddy-data:
+  caddy-config:

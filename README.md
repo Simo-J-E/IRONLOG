@@ -1,4 +1,14 @@
+# IRONLOG — Cloudflare backend
+
+**Free, always-available backend setup (Cloudflare Workers + D1) with GitHub Pages:** see [CLOUDFLARE-SETUP.md](CLOUDFLARE-SETUP.md).
+
+The original Node.js backend still works locally or on a Node server. For GitHub Pages, you **must** configure `IRONLOG_API_URL` to enable Cloudflare account syncing.
+
+---
+
 # IRONLOG
+
+**Already includes a backend.** To save data on another machine you must DEPLOY the full app (not GitHub Pages alone). See [BACKEND-SETUP.md](BACKEND-SETUP.md) for local use and a public HTTPS server.
 
 Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. Includes a workout calendar, complete session history and a three-day chest, back and arms plan.
 
@@ -98,7 +108,7 @@ training.example.com {
 }
 ```
 
-Docker stores the database in the `ironlog-data` named volume. Keep that volume when updating the app. No backend is deployed automatically by the Pages workflow.
+Docker stores the database in the `ironlog-data` named volume. Keep that volume when updating the app. Every 6 hours in production, the server also creates consistent SQLite snapshots in `data/backups/` (keeping the most recent 28), with an early snapshot after startup. **Snapshots on the same disk do not protect against disk failure: regularly copy them off-server.** You can change `BACKUP_INTERVAL_HOURS` and `BACKUP_KEEP` in `.env`. No backend is deployed automatically by the Pages workflow.
 
 Without Docker, build the frontend, configure `.env`, then run:
 
@@ -112,13 +122,13 @@ In production, `NODE_ENV=production` and an HTTPS `PUBLIC_ORIGIN` are required. 
 
 Use **Profile → Export my data** for a portable JSON copy, including an active workout. Keep occasional copies outside the browser. Browser storage requests cannot prevent someone clearing website data, uninstalling the browser, or every form of storage eviction. Account sync provides a second copy once its status says **Synced to your account**.
 
-For a consistent SQLite backup while the Node server is running:
+For an extra on-demand consistent SQLite backup while the Node server is running:
 
 ```bash
 npm run backup -- backups/ironlog.sqlite
 ```
 
-Set `DATABASE_PATH` when using a different database path. Keep server backups outside the application disk as well. The server backup includes accounts and password hashes; keep it private. Restore with the server stopped.
+Set `DATABASE_PATH` when using a different database path. In Docker, the automatic snapshots are available under `/app/data/backups/` and can be copied out with `docker compose cp ironlog:/app/data/backups ./ironlog-backups`. Keep snapshots in a different physical location. **Backups contain account password hashes and private workout history; do not publish them.** Restore with the server stopped. See BACKEND-SETUP.md.
 
 Signing out keeps that account’s local copy for offline recovery; it never becomes guest data or another account’s data. Profile offers both training-data deletion and password-confirmed account deletion. Account deletion removes the server account and its records plus this browser’s account copy. Other devices may retain offline copies until their website data is cleared.
 
