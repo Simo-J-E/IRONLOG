@@ -1,6 +1,12 @@
+
 name = "ironlog-api"
 main = "worker.mjs"
 compatibility_date = "2026-10-09"
 
 [vars]
 ALLOWED_ORIGIN = "https://simo-j-e.github.io,http://localhost:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ironlog-db"
+database_id = "cb3f59b4-3750-44ad-b3d0-be88d00d0a68"
