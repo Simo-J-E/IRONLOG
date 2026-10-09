@@ -117,7 +117,7 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
         limit(`auth:${ip}`, authLimit, 15 * 60000)
         const input = await body(req, 4096)
         const registering = pathname === '/api/auth/register'
-        const usernamePattern = registering ? /^[a-zA-Z0-9_\/]{4,24}$/ : /^[a-zA-Z0-9_\/]{3,24}$/
+        const usernamePattern = new RegExp(`^[a-zA-Z0-9_/]{${registering ? 4 : 3},24}$`)
         if (typeof input.username !== 'string' || !usernamePattern.test(input.username) || !passwordValid(input.password)) throw fail(400, registering ? 'Use a 4–24 character username (letters, numbers, _ or /) and a 12–128 character password.' : 'Invalid username or password format.')
         const username = input.username.toLowerCase()
         let user = db.prepare('SELECT * FROM users WHERE username=?').get(username)
