@@ -208,7 +208,8 @@ export async function mergeGuestTrainingData(accountId: string): Promise<number>
     const [workouts, guestPrograms, guestExercises, guestSettings] = await Promise.all([
       guest.workouts.toArray(), guest.programs.toArray(), guest.exercises.toArray(), guest.settings.get('settings'),
     ])
-    const sources: { collection: Collection; record: StoredRecord }[] = [
+    // These are training records only; account settings cannot be assigned a new ID.
+    const sources: { collection: Exclude<Collection, 'settings'>; record: Exclude<StoredRecord, Settings> }[] = [
       ...workouts.map(record => ({ collection: 'workouts' as const, record })),
       ...guestPrograms.filter(record => record.custom).map(record => ({ collection: 'programs' as const, record })),
       ...guestExercises.filter(record => record.custom).map(record => ({ collection: 'exercises' as const, record })),
@@ -281,6 +282,9 @@ export async function reconcileGuestImportConflict(store: IronlogDB, remote: Rem
     await applyRemote(store, remote)
     return true
   }
+  // Settings has a fixed 'settings' ID and was handled above. Never
+  // create a random-ID settings object while resolving training conflicts.
+  if ('language' in local) return false
   const newId = crypto.randomUUID()
   const moved = { ...local, id: newId }
   await table(store, remote.collection).put(moved)
