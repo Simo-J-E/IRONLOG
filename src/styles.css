@@ -29,7 +29,7 @@
 .account-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.account-actions button{min-height:48px;padding:8px 14px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);font-size:16px;font-weight:700}.account-actions button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
 .account-panel .field-label{font-size:14px}.account-panel .field-label input{font-size:16px}.check-field{display:flex;align-items:flex-start;gap:12px;min-height:48px;margin:18px 0;font-size:16px}.check-field input{width:24px;height:24px;flex-shrink:0;accent-color:var(--red)}
 .rank-table{overflow-x:auto}.rank-table table{width:100%;border-collapse:collapse;font-size:14px}.rank-table caption{text-align:left;font-weight:800;padding:12px 0}.rank-table td,.rank-table th{text-align:left;padding:12px 6px;border-bottom:2px solid #8a8274}.rank-table th[scope=row]{overflow-wrap:anywhere;max-width:140px}.rank-table .own-rank{background:var(--ink);color:var(--paper)}
-.my-rank{padding:12px;border-left:5px solid var(--red);font-size:16px}.my-rank strong{font-size:28px}.conflict-card{border:3px solid var(--red);padding:14px;margin:20px 0;background:var(--paper)}
+.my-rank{padding:12px;border-left:5px solid var(--red);font-size:16px}.my-rank strong{font-size:28px}
 .loading p{font:400 16px/1.5 system-ui;max-width:480px;margin:20px}.loading button{min-height:48px;padding:8px 20px}.workout-mode .current-exercise{padding-bottom:120px}
 
 /* Plans, calendar and full session history. */

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { api } from './account'
-import { resolveConflict } from './storage'
 import type { Account } from './types'
 import type { SyncStatus } from './sync'
 
@@ -56,11 +55,6 @@ export function AccountPanel({ account, status, onAuthenticate, onLogout, onAcco
       {reauth && <button type="button" className="text-button" onClick={() => setReauth(false)}>Cancel</button>}
     </form>}
     {error && <p className="save-warning" role="alert">{error}</p>}
-    {status.conflicts.map(conflict => <div className="conflict-card" key={conflict.key}>
-      <h3>Two versions: {conflict.collection === 'workouts' ? 'workout' : conflict.collection}</h3>
-      <p>Another device changed this record. Your version is still saved here. Both versions are included in your next export.</p>
-      <div className="account-actions"><button disabled={busy} onClick={() => act(async () => { await resolveConflict(conflict, true); await onSync() })}>Keep this device</button><button disabled={busy} onClick={() => act(async () => { await resolveConflict(conflict, false); await onSync() })}>Use synced version</button></div>
-    </div>)}
     <h2 className="section-title">RANKINGS</h2>
     <p>100 points per finished workout + 10 per completed working set, up to 30 sets per workout. Warm-ups and unfinished workouts do not count. Training is self-reported.</p>
     {!account ? <p>Sign in to see rankings. Joining is optional.</p> : <>

@@ -313,6 +313,64 @@ export async function deleteAllData() {
 export async function requestPersistentStorage() {
   try { return await navigator.storage?.persist?.() ?? false } catch { return false }
 }
+/**
+ * Resolve simultaneous device changes without interrupting training.
+ * We keep every distinct workout/custom training record under its own ID.
+ * Built-in records and the singleton settings record use the server copy.
+ * All discarded revisions are also retained in the exportable conflict journal.
+ * Must be called inside an IndexedDB transaction containing all collections,
+ * sync and meta, so a lost tab cannot half-apply a merge.
+ */
+export async function autoResolveConflict(store: IronlogDB, remote: RemoteRecord): Promise<void> {
+  const key = `${remote.collection}:${remote.id}`
+  const state = await store.sync.get(key)
+  if (!state?.dirty) return
+  const local = await table(store, remote.collection).get(remote.id)
+  const same = local && remote.data && sameTrainingRecord(local, remote.data)
+  if (!same) {
+    await store.meta.put({
+      key: `conflict-backup:${crypto.randomUUID()}`,
+      value: { savedAt: timestamp(), local: local ?? null, remote },
+    })
+  }
+
+  // The other device already deleted the server record, or it never existed.
+  // Preserve our newer workout/custom record under another ID, unless the
+  // absent server record was never created in the first place (revision 0).
+  if (local && !remote.data && (remote.revision === 0 || remote.collection === 'settings')) {
+    await store.sync.put({ ...state, revision: remote.revision, mutationId: crypto.randomUUID(), dirty: 1, conflict: undefined })
+    return
+  }
+  if (local && !remote.data && remote.collection !== 'settings' && !('language' in local)) {
+    const id = crypto.randomUUID()
+    const saved = { ...structuredClone(local), id }
+    await table(store, remote.collection).put(saved)
+    await store.sync.put({ key: `${remote.collection}:${id}`, collection: remote.collection, id, revision: 0, mutationId: crypto.randomUUID(), dirty: 1 })
+  }
+
+  // When both devices updated the same workout/custom record, keep the local
+  // variant too. Duplicating built-in exercises/programs would create dozens
+  // of meaningless entries, so their server version is canonical.
+  if (local && remote.data && !same && remote.collection !== 'settings' && !('language' in local) &&
+      (remote.collection === 'workouts' || (('custom' in local) && local.custom))) {
+    const id = crypto.randomUUID()
+    const saved = { ...structuredClone(local), id }
+    await table(store, remote.collection).put(saved)
+    await store.sync.put({ key: `${remote.collection}:${id}`, collection: remote.collection, id, revision: 0, mutationId: crypto.randomUUID(), dirty: 1 })
+  }
+
+  // A local deletion is an intentional edit. Retry deleting at the newest
+  // server revision; the remotely edited version remains in conflictBackups.
+  if (!local && remote.data) {
+    await store.sync.put({ ...state, revision: remote.revision, mutationId: crypto.randomUUID(), dirty: 1, conflict: undefined })
+    return
+  }
+
+  if (remote.data) await table(store, remote.collection).put(remote.data)
+  else await table(store, remote.collection).delete(remote.id)
+  await store.sync.put({ key, collection: remote.collection, id: remote.id, revision: remote.revision, mutationId: '', dirty: 0 })
+}
+
 export async function resolveConflict(state: SyncState, keepLocal: boolean) {
   if (!state.conflict) return
   await db.transaction('rw', table(db, state.collection), db.sync, db.meta, async () => {

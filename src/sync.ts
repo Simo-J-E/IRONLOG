@@ -1,5 +1,5 @@
 import { api, ApiError } from './account'
-import { applyRemote, db, flushWrites, recoverWorkout, reconcileGuestImportConflict, table } from './storage'
+import { applyRemote, db, flushWrites, recoverWorkout, reconcileGuestImportConflict, autoResolveConflict, table } from './storage'
 import { collections, validateRecord } from './validation'
 import type { Account, RemoteRecord, SyncState } from './types'
 
@@ -28,6 +28,16 @@ async function performSync(account: Account, report: (status: SyncStatus) => voi
     await flushWrites()
     await recoverWorkout(store)
     if (!navigator.onLine) throw new Error('offline')
+    const stuck = (await store.sync.toArray()).filter(state => state.conflict && state.dirty)
+    if (stuck.length) {
+      await store.transaction('rw', [...collections.map(c => table(store, c)), store.sync, store.meta], async () => {
+        for (const state of stuck) {
+          if (state.conflict && !await reconcileGuestImportConflict(store, state.conflict)) {
+            await autoResolveConflict(store, state.conflict)
+          }
+        }
+      })
+    }
     report({ state: 'syncing', message: 'Syncing…', pending, conflicts })
     let more = true
     // Bound one pass. Further records resume on the next local edit/reconnect/interval.
@@ -49,8 +59,7 @@ async function performSync(account: Account, report: (status: SyncStatus) => voi
         }
         for (const remote of result.conflicts) {
           if (await reconcileGuestImportConflict(store, remote)) continue
-          const state = await store.sync.get(`${remote.collection}:${remote.id}`)
-          if (state) await store.sync.put({ ...state, conflict: remote })
+          await autoResolveConflict(store, remote)
         }
         for (const remote of result.records) await applyRemote(store, remote)
         await store.meta.put({ key: 'cursor', value: result.cursor })
@@ -60,7 +69,7 @@ async function performSync(account: Account, report: (status: SyncStatus) => voi
       pending = states.length
       more = result.hasMore || states.some(s => !s.conflict)
     }
-    report({ state: conflicts.length ? 'conflict' : pending ? 'syncing' : 'synced', message: conflicts.length ? 'Choose which version to keep' : pending ? 'More changes waiting to sync' : 'Synced to your account', pending, conflicts })
+    report({ state: conflicts.length ? 'conflict' : pending ? 'syncing' : 'synced', message: conflicts.length ? 'Waiting to merge other device changes' : pending ? 'More changes waiting to sync' : 'Synced to your account', pending, conflicts })
     window.dispatchEvent(new Event('ironlog-remote-change'))
   } catch (err) {
     if (store !== db) return
