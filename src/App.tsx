@@ -184,7 +184,7 @@ export default function App() {
   async function authenticate(input:Credentials){
     await waitForSync();await flushWrites()
     const guestBackup=input.importGuest&&db.name==='ironlog'?await exportAllData(activeRef.current):null
-    const result=await api<{user:Account;token?:string}>(input.register?'/auth/register':'/auth/login','POST',{username:input.username,password:input.password,ranked:input.ranked})
+    const result=await api<{user:Account;token?:string}>(input.register?'/auth/register':'/auth/login','POST',{username:input.username,email:input.register?input.email:undefined,password:input.password,ranked:input.ranked})
     if (result.token) saveSessionToken(result.token)
     await changeIdentity(result.user,guestBackup);void requestPersistentStorage()
   }

@@ -4,7 +4,7 @@ import { resolveConflict } from './storage'
 import type { Account } from './types'
 import type { SyncStatus } from './sync'
 
-export interface Credentials { username: string; password: string; ranked: boolean; importGuest: boolean; register: boolean }
+export interface Credentials { username: string; email: string; password: string; ranked: boolean; importGuest: boolean; register: boolean }
 interface Rank { id: string; username: string; rank: number; points: number; workouts: number; sets: number; bench: number }
 interface Ranking { entries: Rank[]; me: Rank | null; updatedAt: string }
 export function AccountPanel({ account, status, onAuthenticate, onLogout, onAccount, onSync, onDelete }: {
@@ -16,6 +16,7 @@ export function AccountPanel({ account, status, onAuthenticate, onLogout, onAcco
   const [register, setRegister] = useState(false)
   const [username, setUsername] = useState(account?.username ?? '')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
   const [ranked, setRanked] = useState(false)
   const [importGuest, setImportGuest] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -39,16 +40,18 @@ export function AccountPanel({ account, status, onAuthenticate, onLogout, onAcco
     <h2 className="section-title">ACCOUNT</h2>
     {account && !reauth ? <>
       <div className="account-heading"><strong>{account.username}</strong><span>{status.pending ? `${status.pending} changes waiting` : status.message}</span></div>
+      {account.email && <p className="muted">Email: {account.email}</p>}
       {status.pending > 0 && <p>Keep this device copy until syncing finishes.</p>}
       {status.state === 'error' && <><p role="status">{status.message}</p><button className="text-button" onClick={() => setReauth(true)}>Sign in again</button></>}
       <div className="account-actions"><button disabled={busy} onClick={() => act(onSync)}>Sync now</button><button disabled={busy} onClick={() => act(onLogout)}>Sign out</button></div>
       <label className="check-field"><input type="checkbox" checked={account.ranked} disabled={busy} onChange={e => { const next = e.target.checked; void act(async () => { const result = await api<{ user: Account }>('/account', 'PATCH', { ranked: next }); onAccount(result.user) }) }}/><span>Show my username and training totals in rankings</span></label>
-    </> : <form onSubmit={e => { e.preventDefault(); void act(async () => { await onAuthenticate({ username, password, ranked, importGuest, register: register && !account }); setPassword(''); setReauth(false) }) }}>
+    </> : <form onSubmit={e => { e.preventDefault(); void act(async () => { await onAuthenticate({ username, email, password, ranked, importGuest, register: register && !account }); setPassword(''); setReauth(false) }) }}>
       <p>Training saves on your device. Sign in to sync it between devices.</p>
       {!account && <div className="account-actions"><button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>Sign in</button><button type="button" aria-pressed={register} onClick={() => setRegister(true)}>Create account</button></div>}
-      <label className="field-label">Username<input autoComplete="username" required pattern={register ? '[A-Za-z0-9_\\/]{4,24}' : '[A-Za-z0-9_\\/]{3,24}'} minLength={register ? 4 : 3} maxLength={24} value={username} onChange={e => setUsername(e.target.value)} spellCheck={false} autoCapitalize="none"/></label>
-      <label className="field-label">Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)}/></label>
-      {register && <p className="muted">Username: 4–24 characters. Letters, numbers, _ and / allowed. Password: at least 12 characters. Save your password: email recovery is not available.</p>}
+      <label className="field-label">{register ? 'Username' : 'Username or email'}<input autoComplete="username" required pattern={register ? '[A-Za-z0-9_/]{1,50}' : undefined} maxLength={register ? 50 : 254} value={username} onChange={e => setUsername(e.target.value)} spellCheck={false} autoCapitalize="none"/></label>
+      {register && <label className="field-label">Email<input type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} /></label>
+      <label className="field-label">Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required maxLength={register ? 50 : 128} value={password} onChange={e => setPassword(e.target.value)}/></label>
+      {register && <p className="muted">Username and password: 1–50 characters. Letters, numbers, _ and / allowed in usernames. Email is required but not verified; password recovery is not available.</p>}
       {!account && <label className="check-field"><input type="checkbox" checked={importGuest} onChange={e => setImportGuest(e.target.checked)}/><span>Copy my guest workouts and programs into this account</span></label>}
       {register && <label className="check-field"><input type="checkbox" checked={ranked} onChange={e => setRanked(e.target.checked)}/><span>Join rankings with my username and training totals</span></label>}
       <button className="primary" disabled={busy}>{busy ? 'Connecting…' : register && !account ? 'Create account' : 'Sign in'}</button>

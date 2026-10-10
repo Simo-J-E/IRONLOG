@@ -5,7 +5,7 @@ import { localStatus } from './sync'
 
 afterEach(cleanup)
 
-it('allows a slash in usernames, requires 4 characters at signup, but lets existing 3-character users log in', () => {
+it('allows 1–50 characters for new usernames/passwords, slash usernames, and requires an email', () => {
   render(<AccountPanel
     account={null}
     status={localStatus}
@@ -15,15 +15,24 @@ it('allows a slash in usernames, requires 4 characters at signup, but lets exist
     onSync={async () => {}}
     onDelete={async () => {}}
   />)
-  const username = screen.getByRole('textbox', { name: 'Username' }) as HTMLInputElement
-  expect(username.minLength).toBe(3)
   fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-  expect(username.minLength).toBe(4)
-  fireEvent.change(username, { target: { value: 'ab/c' } })
+  const username = screen.getByRole('textbox', { name: 'Username' }) as HTMLInputElement
+  const email = screen.getByRole('textbox', { name: 'Email' }) as HTMLInputElement
+  const password = screen.getByLabelText('Password') as HTMLInputElement
+  expect(username.minLength).toBe(-1)
+  expect(username.maxLength).toBe(50)
+  expect(password.minLength).toBe(-1)
+  expect(password.maxLength).toBe(50)
+  expect(email.required).toBe(true)
+  expect(email.type).toBe('email')
+  fireEvent.change(username, { target: { value: 'a/b' } })
   expect(username.validity.patternMismatch).toBe(false)
-  fireEvent.change(username, { target: { value: 'abc' } })
-  expect(username.validity.tooShort || username.validity.patternMismatch).toBe(true)
+  fireEvent.change(username, { target: { value: 'a' } })
+  expect(username.validity.patternMismatch).toBe(false)
+  fireEvent.change(email, { target: { value: 'not-an-email' } })
+  expect(email.validity.typeMismatch).toBe(true)
+  fireEvent.change(email, { target: { value: 'lifter@example.com' } })
+  expect(email.validity.valid).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-  expect(username.minLength).toBe(3)
-  expect(username.validity.patternMismatch).toBe(false)
+  expect(screen.getByRole('textbox', { name: 'Username or email' })).toBe(username)
 })

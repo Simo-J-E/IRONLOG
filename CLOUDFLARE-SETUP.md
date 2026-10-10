@@ -48,6 +48,20 @@ Requirements: Node.js 24+ and a free [Cloudflare account](https://dash.cloudflar
 
 **Important:** A Worker deployment does not deploy the GitHub Pages frontend. Pushing the code to GitHub does that. GitHub Pages must be enabled in repository settings with source **GitHub Actions**.
 
+## Updating an existing Cloudflare installation
+
+**Do not create a new D1 database.** Keep the `database_id` of your existing D1 binding in `cloudflare/wrangler.toml`. Before updating, export a backup of your existing data, then run:
+
+```powershell
+npx wrangler d1 export ironlog-db --remote --output ironlog-pre-email-backup.sql --config cloudflare/wrangler.toml
+npx wrangler d1 migrations apply DB --remote --config cloudflare/wrangler.toml
+npx wrangler deploy --config cloudflare/wrangler.toml
+```
+
+Migration `0002_user_emails.sql` adds an optional email column and a unique email index without deleting old accounts or workouts. New accounts require an email; existing accounts still sign in by username and do not automatically gain an email address. Email is stored but **not verified and cannot be used for password recovery**. Existing long passwords remain valid for sign-in.
+
+Then push the updated frontend to GitHub Pages. Deploying the Worker alone does not update the website.
+
 ## Local frontend + local Worker
 
 Open two terminals from the project root. Apply the migration locally and start Wrangler:
@@ -77,7 +91,7 @@ Open `http://localhost:5173`. The local D1 database is separate from your remote
   Store backup files privately; they contain user information and password hashes. Do **not** commit them to your public GitHub repository. Cloudflare D1 also has Time Travel recovery, up to **7 days on the Free plan**.
 
 - Login uses PBKDF2 password hashes, revocable 30-day session tokens, and exact-origin CORS. The GitHub Pages frontend stores its session token in browser local storage because cross-site cookies do not work reliably for `github.io` → `workers.dev`. Avoid third-party scripts or untrusted code in the frontend. Log out on shared devices.
-- Register uses usernames, no email. **There is no password reset**. Store your password safely.
+- Registration now requires an email. Email verification and password resets are **not** implemented. Store your password safely. New username/password fields allow 1–50 characters; choose a long, unique password for security.
 - Workers Free is limited (including 100,000 requests/day and 10 ms CPU/request); D1 also has daily database usage limits. A service can temporarily return errors if a quota is exceeded. Local device records remain usable offline.
 - **Existing accounts on the old Node/SQLite backend do not automatically migrate.** Export your workouts from that old app before switching, then import them into your Cloudflare account.
 - Updating or removing the Worker or database may stop syncing. Cloudflare stores your data while the database exists, but no provider promises 100% uptime. Keep independent exports.

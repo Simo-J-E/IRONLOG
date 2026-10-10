@@ -25,7 +25,7 @@ function client() {
       if (body.user) user = body.user
       return { status: res.status, body, headers: res.headers }
     },
-    async register(username, ranked = false) { const r = await this.request('/auth/register', 'POST', { username, password: 'Long unique test password!', ranked }); assert.equal(r.status, 200, JSON.stringify(r.body)); return r },
+    async register(username, ranked = false) { const r = await this.request('/auth/register', 'POST', { username, email: `${username.replace(/[^a-z0-9]/gi, '-').toLowerCase()}@example.com`, password: 'Long unique test password!', ranked }); assert.equal(r.status, 200, JSON.stringify(r.body)); return r },
     async sync(changes = [], cursor = 0) { return this.request('/sync', 'POST', { accountId: user.id, cursor, changes }) }
   }
 }
@@ -121,16 +121,48 @@ test('automatic backup snapshot contains committed workouts and trims old snapsh
 })
 
 
-test('username validation accepts slash, requires 4 characters to register, and allows older accounts to log in', async () => {
+test('username and password support lengths 1–50 and email sign-in; duplicate emails are rejected', async () => {
   const person = client()
-  const password = 'Long unique test password!'
-  let res = await person.request('/auth/register', 'POST', { username: 'abc', password })
+  let res = await person.request('/auth/register', 'POST', { username: 'a', email: 'A@EXAMPLE.COM', password: 'x' })
+  assert.equal(res.status, 200, JSON.stringify(res.body))
+  assert.equal(res.body.user.email, 'a@example.com')
+  assert.equal(app.db.prepare('SELECT email FROM users WHERE username=?').get('a').email, 'a@example.com')
+  res = await client().request('/auth/login', 'POST', { username: 'a@example.com', password: 'x' })
+  assert.equal(res.status, 200)
+
+  res = await client().request('/auth/register', 'POST', { username: 'ab/c', email: 'slash@example.com', password: 'x'.repeat(50) })
+  assert.equal(res.status, 200)
+  res = await client().request('/auth/login', 'POST', { username: 'AB/C', password: 'x'.repeat(50) })
+  assert.equal(res.status, 200)
+  res = await client().request('/auth/register', 'POST', { username: 'test', email: 'SLASH@EXAMPLE.COM', password: 'x' })
+  assert.equal(res.status, 409)
+  res = await client().request('/auth/register', 'POST', { username: 'z'.repeat(50), email: 'long@example.com', password: 'x' })
+  assert.equal(res.status, 200)
+  res = await client().request('/auth/register', 'POST', { username: 'z'.repeat(51), email: 'longer@example.com', password: 'x' })
   assert.equal(res.status, 400)
-  res = await person.register('AB/C')
-  assert.equal(res.body.user.username, 'ab/c')
-  res = await client().request('/auth/login', 'POST', { username: 'ab/c', password })
-  assert.equal(res.status, 200)
-  app.db.prepare('UPDATE users SET username=? WHERE username=?').run('abc', 'ab/c')
-  res = await client().request('/auth/login', 'POST', { username: 'abc', password })
-  assert.equal(res.status, 200)
+  res = await client().request('/auth/register', 'POST', { username: 'b', email: 'b@example.com', password: 'x'.repeat(51) })
+  assert.equal(res.status, 400)
+  res = await client().request('/auth/register', 'POST', { username: 'b', password: 'x' })
+  assert.equal(res.status, 400)
+  res = await client().request('/auth/register', 'POST', { username: 'b', email: 'invalid', password: 'x' })
+  assert.equal(res.status, 400)
+  res = await client().request('/auth/register', 'POST', { username: '', email: 'empty@example.com', password: 'x' })
+  assert.equal(res.status, 400)
+  res = await client().request('/auth/register', 'POST', { username: 'b', email: 'empty@example.com', password: '' })
+  assert.equal(res.status, 400)
+})
+
+test('existing SQLite users get optional email column without losing their data', async () => {
+  const { DatabaseSync } = await import('node:sqlite')
+  const legacyPath = join(directory, 'legacy.sqlite')
+  const legacy = new DatabaseSync(legacyPath)
+  legacy.exec('CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT UNIQUE COLLATE NOCASE NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL, ranked INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)')
+  legacy.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run('legacy-1', 'veteran', 'salt', 'hash', 0, 100)
+  legacy.close()
+  const upgraded = createApp({ databasePath: legacyPath, publicOrigin: origin })
+  try {
+    const old = upgraded.db.prepare('SELECT username,email FROM users WHERE id=?').get('legacy-1')
+    assert.equal(old.username, 'veteran')
+    assert.equal(old.email, null)
+  } finally { await upgraded.close() }
 })

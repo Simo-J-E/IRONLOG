@@ -2,8 +2,10 @@
 import { collections, validateRecord } from '../src/validation.ts'
 
 const fail = (status, message) => Object.assign(new Error(message), { status })
-const publicUser = row => ({ id: row.id, username: row.username, ranked: !!row.ranked })
-const passwordValid = p => typeof p === 'string' && p.length >= 12 && p.length <= 128
+const publicUser = row => ({ id: row.id, username: row.username, email: row.email ?? null, ranked: !!row.ranked })
+const passwordValid = (p, registering = false) => typeof p === 'string' && p.length > 0 && p.length <= (registering ? 50 : 128)
+const usernameValid = value => typeof value === 'string' && /^[a-zA-Z0-9_/]{1,50}$/.test(value)
+const emailValid = value => typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 const enc = new TextEncoder()
 const hex = bytes => [...new Uint8Array(bytes)].map(n => n.toString(16).padStart(2, '0')).join('')
 const randomHex = count => hex(crypto.getRandomValues(new Uint8Array(count)))
@@ -74,20 +76,23 @@ async function handle(req, env) {
     await limit(env.DB, `auth:${ip}`, 20, 15 * 60_000)
     const input = await body(req, 4096)
     const registering = pathname === '/api/auth/register'
-    const usernamePattern = new RegExp(`^[a-zA-Z0-9_/]{${registering ? 4 : 3},24}$`)
-    if (typeof input.username !== 'string' || !usernamePattern.test(input.username) || !passwordValid(input.password)) throw fail(400, registering ? 'Use a 4–24 character username (letters, numbers, _ or /) and a 12–128 character password.' : 'Invalid username or password format.')
+    if (!usernameValid(input.username) && !(!registering && emailValid(input.username))) throw fail(400, 'Enter a valid username or email (username: 1–50 characters).')
+    if (!passwordValid(input.password, registering)) throw fail(400, 'Password is required and must be 50 characters or fewer for new accounts.')
+    if (registering && !emailValid(input.email)) throw fail(400, 'Enter a valid email address.')
     const username = input.username.toLowerCase()
-    let user = await env.DB.prepare('SELECT * FROM users WHERE username=?').bind(username).first()
+    const email = registering ? input.email.toLowerCase() : null
+    let user = await env.DB.prepare('SELECT * FROM users WHERE username=? OR email=?').bind(username, username).first()
     if (pathname.endsWith('/register')) {
       await limit(env.DB, `register:${ip}`, 5, 60 * 60_000)
       if (user) throw fail(409, 'That username is already taken.')
+      if (await env.DB.prepare('SELECT 1 FROM users WHERE email=?').bind(email).first()) throw fail(409, 'That email is already registered.')
       const salt = randomHex(32)
       const hash = await derivePassword(input.password, salt)
       const id = crypto.randomUUID()
       try {
-        await env.DB.prepare('INSERT INTO users (id,username,salt,password_hash,ranked,created_at) VALUES(?,?,?,?,?,?)')
-          .bind(id, username, salt, hash, input.ranked === true ? 1 : 0, Date.now()).run()
-      } catch (err) { if (String(err).includes('UNIQUE')) throw fail(409, 'That username is already taken.'); throw err }
+        await env.DB.prepare('INSERT INTO users (id,username,email,salt,password_hash,ranked,created_at) VALUES(?,?,?,?,?,?,?)')
+          .bind(id, username, email, salt, hash, input.ranked === true ? 1 : 0, Date.now()).run()
+      } catch (err) { if (String(err).includes('UNIQUE')) throw fail(409, 'That username or email is already registered.'); throw err }
       user = await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(id).first()
     } else {
       const hash = await derivePassword(input.password, user?.salt ?? 'ironlog-no-such-user')

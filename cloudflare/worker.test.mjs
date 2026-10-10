@@ -8,6 +8,7 @@ function d1() {
   const database = new DatabaseSync(':memory:')
   database.exec('PRAGMA foreign_keys=ON;')
   database.exec(readFileSync(new URL('./migrations/0001_init.sql', import.meta.url), 'utf8'))
+  database.exec(readFileSync(new URL('./migrations/0002_user_emails.sql', import.meta.url), 'utf8'))
   const prepare = sql => {
     let args = []
     return {
@@ -53,7 +54,7 @@ test('Cloudflare API: register, login, auth, sync, conflicts, rankings, logout, 
     assert.equal(preflight.status, 204)
     assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), 'https://lifter.github.io')
     const pwd='password-that-is-long-enough'
-    const res = await call(env, '/api/auth/register', 'POST', { username: 'TestLifter', password: pwd, ranked: true })
+    const res = await call(env, '/api/auth/register', 'POST', { username: 'TestLifter', email: 'testlifter@example.com', password: pwd, ranked: true })
     assert.equal(res.status, 200, await res.text().then(x => x))
   } finally { db.close() }
 })
@@ -63,7 +64,7 @@ test('Cloudflare API: sessions and workout data round-trip', async () => {
   const env = { DB: db, ALLOWED_ORIGIN: 'https://lifter.github.io' }
   try {
     const pwd='password-that-is-long-enough'
-    let res = await call(env, '/api/auth/register', 'POST', { username: 'TestLifter', password: pwd, ranked: true })
+    let res = await call(env, '/api/auth/register', 'POST', { username: 'TestLifter', email: 'testlifter@example.com', password: pwd, ranked: true })
     assert.equal(res.status, 200)
     const {user, token} = await res.json()
     assert.ok(token?.length===64)
@@ -98,29 +99,54 @@ test('Cloudflare API: sessions and workout data round-trip', async () => {
 })
 
 
-test('Cloudflare username rules: 4-character minimum, / allowed, and legacy 3-character logins', async () => {
+test('Cloudflare usernames/passwords have no minimum beyond nonempty, 50-character maximum, unique emails and email login', async () => {
   const db = d1()
   const env = { DB: db, ALLOWED_ORIGIN: 'https://lifter.github.io' }
-  const password = 'password-that-is-long-enough'
   try {
-    let res = await call(env, '/api/auth/register', 'POST', { username: 'abc', password })
-    assert.equal(res.status, 400)
-    assert.match((await res.json()).error, /4–24/)
-
-    res = await call(env, '/api/auth/register', 'POST', { username: 'AB/C', password })
+    let res = await call(env, '/api/auth/register', 'POST', { username: 'a', email: 'a@example.com', password: 'x' })
     assert.equal(res.status, 200, await res.clone().text())
-    assert.equal((await res.json()).user.username, 'ab/c')
+    assert.equal((await res.json()).user.email, 'a@example.com')
 
-    res = await call(env, '/api/auth/login', 'POST', { username: 'ab/c', password })
+    res = await call(env, '/api/auth/login', 'POST', { username: 'A@EXAMPLE.COM', password: 'x' })
     assert.equal(res.status, 200)
 
-    res = await call(env, '/api/auth/register', 'POST', { username: 'ab c', password })
+    res = await call(env, '/api/auth/register', 'POST', { username: 'a/b', email: 'same@example.com', password: 'p'.repeat(50) })
+    assert.equal(res.status, 200, await res.clone().text())
+    res = await call(env, '/api/auth/register', 'POST', { username: 'new', email: 'SAME@EXAMPLE.COM', password: 'x' })
+    assert.equal(res.status, 409)
+
+    res = await call(env, '/api/auth/register', 'POST', { username: 'z'.repeat(50), email: 'long@example.com', password: 'p' })
+    assert.equal(res.status, 200, await res.clone().text())
+    res = await call(env, '/api/auth/register', 'POST', { username: 'z'.repeat(51), email: 'longer@example.com', password: 'p' })
     assert.equal(res.status, 400)
-
-    // Accounts created before the four-character rule may still have three letters.
-    await db.prepare('UPDATE users SET username=? WHERE username=?').bind('abc', 'ab/c').run()
-    res = await call(env, '/api/auth/login', 'POST', { username: 'abc', password })
+    res = await call(env, '/api/auth/register', 'POST', { username: 'p', email: 'p@example.com', password: 'p'.repeat(51) })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/register', 'POST', { username: 'no-email', password: 'x' })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/register', 'POST', { username: 'invalid-email', email: 'not-email', password: 'x' })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/register', 'POST', { username: 'ab c', email: 'space@example.com', password: 'x' })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/register', 'POST', { username: '', email: 'empty@example.com', password: 'x' })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/register', 'POST', { username: 'empty-pass', email: 'pass@example.com', password: '' })
+    assert.equal(res.status, 400)
+    res = await call(env, '/api/auth/login', 'POST', { username: 'a/b', password: 'p'.repeat(50) })
     assert.equal(res.status, 200)
-    assert.equal((await res.json()).user.username, 'abc')
+  } finally { db.close() }
+})
+
+test('email migration preserves existing D1 users and workouts', () => {
+  const db = new DatabaseSync(':memory:')
+  try {
+    db.exec(readFileSync(new URL('./migrations/0001_init.sql', import.meta.url), 'utf8'))
+    db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run('older-user', 'older', 'salt', 'hash', 1, 100)
+    db.prepare('INSERT INTO records (user_id,collection,id,revision,mutation_id,data,sequence) VALUES (?,?,?,?,?,?,?)')
+      .run('older-user', 'workouts', 'saved', 1, 'mut', '{}', 1)
+    db.exec(readFileSync(new URL('./migrations/0002_user_emails.sql', import.meta.url), 'utf8'))
+    const old = db.prepare('SELECT username,email FROM users WHERE id=?').get('older-user')
+    assert.equal(old.username, 'older')
+    assert.equal(old.email, null)
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM records WHERE user_id=?').get('older-user').n, 1)
   } finally { db.close() }
 })

@@ -73,7 +73,7 @@ Warm up before working sets. Choose weights you can control, leave about 1–2 r
 
 ## Rankings
 
-Participation is optional. Enable it when creating an account or in Profile. The leaderboard shows usernames, workout counts and points, and updates after sync. New usernames are 4–24 characters and may contain letters, numbers, `_` and `/`. Existing three-character account names can still sign in.
+Participation is optional. Enable it when creating an account or in Profile. The leaderboard shows usernames, workout counts and points, and updates after sync. New usernames are 1–50 characters and may contain letters, numbers, `_` and `/`. Existing three-character account names can still sign in.
 
 - 100 points for a finished workout containing at least one completed working set.
 - 10 additional points per completed working set, up to 30 sets per workout.
@@ -116,7 +116,7 @@ Without Docker, build the frontend, configure `.env`, then run:
 node --env-file=.env server/index.mjs
 ```
 
-In production, `NODE_ENV=production` and an HTTPS `PUBLIC_ORIGIN` are required. The server uses Secure, HttpOnly, SameSite cookies; salted scrypt password hashes; expiring sessions; origin checks; request limits; parameterized queries; and per-account authorization. Passwords must contain 12–128 characters. Email verification and password recovery are not included, so save your password.
+In production, `NODE_ENV=production` and an HTTPS `PUBLIC_ORIGIN` are required. The server uses Secure, HttpOnly, SameSite cookies; salted scrypt password hashes; expiring sessions; origin checks; request limits; parameterized queries; and per-account authorization. New accounts have no minimum length beyond one required character, and usernames/passwords have a 50-character maximum. For safety, choose a long, unique password. Email verification and password recovery are not implemented, so save your password.
 
 ## Backups and deletion
 
@@ -154,3 +154,8 @@ npm run test:e2e
 - [MDN: visibility and mobile unload limitations](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event)
 
 The updated project is provided as source code. Hosting credentials, account data, local databases and Git history are excluded from the ZIP.
+
+
+### Account email and validation
+
+New accounts require an email address and accept a nonempty username and password of up to 50 characters. You can sign in using your username or your email. Usernames allow letters, numbers, `_`, and `/`. Email is not verified, and password recovery has not been implemented. Existing accounts can continue signing in with their username. Before deploying, run the Cloudflare migration commands in `CLOUDFLARE-SETUP.md`.

@@ -100,7 +100,7 @@ export interface SyncState {
   dirty: number
   conflict?: RemoteRecord
 }
-export interface Account { id: string; username: string; ranked: boolean }
+export interface Account { id: string; username: string; email?: string | null; ranked: boolean }
 
 export interface Settings {
   id: 'settings'

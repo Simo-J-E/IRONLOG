@@ -11,9 +11,11 @@ import { snapshotDatabase } from './backups.mjs'
 const derive = promisify(scrypt)
 const sha = value => createHash('sha256').update(value).digest('hex')
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const publicUser = row => ({ id: row.id, username: row.username, ranked: !!row.ranked })
+const publicUser = row => ({ id: row.id, username: row.username, email: row.email ?? null, ranked: !!row.ranked })
 const fail = (status, message) => Object.assign(new Error(message), { status })
-const passwordValid = p => typeof p === 'string' && p.length >= 12 && p.length <= 128
+const passwordValid = (p, registering = false) => typeof p === 'string' && p.length > 0 && p.length <= (registering ? 50 : 128)
+const usernameValid = value => typeof value === 'string' && /^[a-zA-Z0-9_/]{1,50}$/.test(value)
+const emailValid = value => typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 const SCRYPT = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 }
 let hashing = 0
 async function passwordHash(password, salt) {
@@ -36,6 +38,9 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
     INSERT OR IGNORE INTO sequence_counter VALUES(1,0);
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, hits INTEGER NOT NULL, reset_at INTEGER NOT NULL);
     PRAGMA user_version=1;`)
+  // Existing SQLite accounts stay intact; only add an optional email field.
+  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT')
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email COLLATE NOCASE) WHERE email IS NOT NULL')
   // In production, save snapshots on the same persistent disk as SQLite.
   // Keep copies OFF this machine too: a failed disk destroys both the DB and snapshots.
   const snapshots = backupDirectory ?? resolve(dirname(databasePath), 'backups')
@@ -117,17 +122,20 @@ export function createApp({ databasePath = resolve(ROOT, 'data/ironlog.sqlite'),
         limit(`auth:${ip}`, authLimit, 15 * 60000)
         const input = await body(req, 4096)
         const registering = pathname === '/api/auth/register'
-        const usernamePattern = new RegExp(`^[a-zA-Z0-9_/]{${registering ? 4 : 3},24}$`)
-        if (typeof input.username !== 'string' || !usernamePattern.test(input.username) || !passwordValid(input.password)) throw fail(400, registering ? 'Use a 4–24 character username (letters, numbers, _ or /) and a 12–128 character password.' : 'Invalid username or password format.')
+        if (!usernameValid(input.username) && !(!registering && emailValid(input.username))) throw fail(400, 'Enter a valid username or email (username: 1–50 characters).')
+        if (!passwordValid(input.password, registering)) throw fail(400, 'Password is required and must be 50 characters or fewer for new accounts.')
+        if (registering && !emailValid(input.email)) throw fail(400, 'Enter a valid email address.')
         const username = input.username.toLowerCase()
-        let user = db.prepare('SELECT * FROM users WHERE username=?').get(username)
+        const email = registering ? input.email.toLowerCase() : null
+        let user = db.prepare('SELECT * FROM users WHERE username=? OR email=?').get(username, username)
         if (pathname.endsWith('register')) {
           limit(`register:${ip}`, 5, 3600000)
           if (user) throw fail(409, 'That username is already taken.')
+          if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) throw fail(409, 'That email is already registered.')
           const salt = randomBytes(32).toString('hex')
           const hash = await passwordHash(input.password, salt)
           const id = randomUUID()
-          try { db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run(id, username, salt, hash.toString('hex'), input.ranked === true ? 1 : 0, Date.now()) } catch (err) { if (String(err).includes('UNIQUE')) throw fail(409, 'That username is already taken.'); throw err }
+          try { db.prepare('INSERT INTO users (id,username,email,salt,password_hash,ranked,created_at) VALUES(?,?,?,?,?,?,?)').run(id, username, email, salt, hash.toString('hex'), input.ranked === true ? 1 : 0, Date.now()) } catch (err) { if (String(err).includes('UNIQUE')) throw fail(409, 'That username or email is already registered.'); throw err }
           user = db.prepare('SELECT * FROM users WHERE id=?').get(id)
         } else {
           const hash = await passwordHash(input.password, user?.salt ?? 'ironlog-nonexistent-account-padding')
