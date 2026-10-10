@@ -10,10 +10,10 @@ const date = parseLocalDate
 
 describe('calendar scheduling', () => {
   it('assigns Monday/Wednesday/Friday by weekday order, independent of click order or missed sessions', () => {
-    expect(scheduledWorkout(upper, settings, date('2026-09-14'))?.id).toBe('ca-a')
-    expect(scheduledWorkout(upper, settings, date('2026-09-16'))?.id).toBe('ca-b')
-    expect(scheduledWorkout(upper, settings, date('2026-09-18'))?.id).toBe('ca-c')
-    expect(scheduledWorkout(upper, settings, date('2026-09-23'))?.id).toBe('ca-b')
+    expect(scheduledWorkout(upper, settings, date('2026-09-14'))?.id).toBe('hh-push')
+    expect(scheduledWorkout(upper, settings, date('2026-09-16'))?.id).toBe('hh-pull')
+    expect(scheduledWorkout(upper, settings, date('2026-09-18'))?.id).toBe('hh-upper')
+    expect(scheduledWorkout(upper, settings, date('2026-09-23'))?.id).toBe('hh-push')
     expect(scheduledWorkout(upper, settings, date('2026-09-15'))).toBeUndefined()
   })
   it('alternates two sessions over a three-day week, including the next week', () => {
@@ -22,21 +22,21 @@ describe('calendar scheduling', () => {
   })
   it('keeps Sunday last and preserves dates through DST and year boundaries', () => {
     const sunday = { ...settings, trainingDays: [0, 3, 1], scheduleStartDate: '2026-10-19' }
-    expect(scheduledWorkout(upper, sunday, date('2026-10-25'))?.id).toBe('ca-c')
-    expect(scheduledWorkout(upper, sunday, date('2026-10-26'))?.id).toBe('ca-a')
-    expect(scheduledWorkout(upper, { ...settings, scheduleStartDate: '2026-12-28' }, date('2027-01-01'))?.id).toBe('ca-c')
+    expect(scheduledWorkout(upper, sunday, date('2026-10-25'))?.id).toBe('hh-upper')
+    expect(scheduledWorkout(upper, sunday, date('2026-10-26'))?.id).toBe('hh-lower')
+    expect(scheduledWorkout(upper, { ...settings, scheduleStartDate: '2026-12-28' }, date('2027-01-01'))?.id).toBe('hh-upper')
     expect(localDateKey(addDays(date('2026-10-25'), 1))).toBe('2026-10-26')
   })
   it('shows the next training date on rest days and does not suggest a workout already completed today', () => {
-    const log: WorkoutLog = { id: 'done', programId: upper.id, workoutId: 'ca-b', workoutName: 'Upper B', startedAt: date('2026-09-16').toISOString(), finishedAt: date('2026-09-16').toISOString(), exercises: [] }
-    expect(upcomingWorkouts(upper, settings, [], date('2026-09-15'))[0]?.workout.id).toBe('ca-b')
+    const log: WorkoutLog = { id: 'done', programId: upper.id, workoutId: 'hh-pull', workoutName: 'Upper B', startedAt: date('2026-09-16').toISOString(), finishedAt: date('2026-09-16').toISOString(), exercises: [] }
+    expect(upcomingWorkouts(upper, settings, [], date('2026-09-15'))[0]?.workout.id).toBe('hh-pull')
     const next = upcomingWorkouts(upper, settings, [log], date('2026-09-16'))[0]!
     expect(localDateKey(next.date)).toBe('2026-09-18')
-    expect(next.workout.id).toBe('ca-c')
+    expect(next.workout.id).toBe('hh-upper')
   })
   it('never invents planned workouts before the current schedule started', () => {
     expect(scheduledWorkout(upper, { ...settings, scheduleStartDate: '2026-09-16' }, date('2026-09-14'))).toBeUndefined()
-    expect(scheduledWorkout(upper, { ...settings, scheduleStartDate: '2026-09-16' }, date('2026-09-16'))?.id).toBe('ca-b')
+    expect(scheduledWorkout(upper, { ...settings, scheduleStartDate: '2026-09-16' }, date('2026-09-16'))?.id).toBe('hh-pull')
   })
   it('accepts old settings while rejecting impossible calendar dates and duplicate training days', () => {
     expect(validateRecord('settings', { ...settings, scheduleStartDate: undefined })).toBe(true)

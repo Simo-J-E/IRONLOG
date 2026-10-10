@@ -10,7 +10,7 @@ The original Node.js backend still works locally or on a Node server. For GitHub
 
 **Already includes a backend.** To save data on another machine you must DEPLOY the full app (not GitHub Pages alone). See [BACKEND-SETUP.md](BACKEND-SETUP.md) for local use and a public HTTPS server.
 
-Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. Includes a workout calendar, complete session history and a three-day chest, back and arms plan.
+Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. Includes a workout calendar, complete session history and heavy Hollywood-inspired 3-day and 4-day gym plans.
 
 ### Automatic device-to-account sync
 
@@ -42,26 +42,38 @@ Open `http://localhost:3001`. Keep using the same browser and website address: b
 
 - **Today** shows the selected plan, next scheduled workout with all exercises, and the next three training dates. Tap a date to open it in the calendar.
 - **Programs** opens the selected plan in full. Each session lists its exercises, primary muscles, sets, rep targets and rest times. Other programs can be previewed before selection.
-- **Calendar** shows a month at a time. Tap a day or use **Go to date** to see exactly what is scheduled, including future Wednesdays. A/B/C refer to the sessions in the legend. Completed and unfinished workouts are marked separately.
-- Open **Training days** in the calendar to change weekdays. Monday/Wednesday/Friday is the default. Days always use Monday-to-Sunday order, regardless of the order you tapped them.
+- **Calendar** shows a month at a time. Tap a day or use **Go to date** to see exactly what is scheduled, including future Wednesdays. A/B/C/D refer to the sessions in the legend for four-day programs. Completed and unfinished workouts are marked separately.
+- Open **Training days** in the calendar to change weekdays. Monday/Tuesday/Thursday/Saturday is the default for new installations. Your previously chosen days are retained when upgrading. Days always use Monday-to-Sunday order, regardless of the order you tapped them.
 - Workouts rotate continuously across the chosen days. For example, a two-session A/B plan on three weekly days alternates A/B/A then B/A/B. Missing a workout does not shift future dates.
 - Changing the plan or weekdays restarts the rotation from Monday of the current week, with planned dates shown from the day of the change onward. Old completed and unfinished records remain visible on their actual training dates. Earlier planned schedules are not archived.
 - On rest days, Today previews the next scheduled session. Starting it early, or doing a missed session from the calendar, records it on the date you actually train. It does not mark a future date complete. Future dates in the calendar are previews.
 - **History** now lists every saved session, newest first, including unfinished sessions. Expand one to see the date, duration, exercises, every set's weight/reps, warm-ups, completion status and notes. Search by workout/exercise name or filter by dates. Only completed working sets contribute to volume. Units follow your profile.
 - **Finish → View history** opens your completed workout log directly. **Save & exit** leaves a session unfinished; use **Resume workout** to continue.
-- Existing browser data upgrades in place. The previous built-in Chest + Arms Growth plan becomes **Chest, Back + Arms**. Custom plans, saved sessions and active workout snapshots are preserved. Other selected plans remain selected.
+- Existing browser data upgrades in place. The previous recommended plan becomes **Hollywood Heavy · 4 Days** (revision 3). Custom plans, saved sessions and active workout snapshots are preserved. Other selected plans remain selected.
 
-### Recommended plan
+### Recommended plan — Hollywood Heavy (4 days)
 
-Default schedule, about 50–65 minutes per session:
+Train all four days hard, but always with good form. Main lifts use relatively heavy weights; smaller isolation exercises use more repetitions to reduce the need for sloppy maximal loads. **These are actor-inspired gym templates, not an actor's verified exact workout.**
 
-| Day | Session | Exercises (sets × reps) |
+| Day | Session | Working sets × reps |
 | --- | --- | --- |
-| Monday | Upper A · Chest + Back | Bench press 3×6–10; seated row 3×8–12; incline dumbbell press 2×8–12; dumbbell curl 3×8–12; pushdown 3×10–15; lateral raise 2×12–15 |
-| Wednesday | Upper B · Back + Arms | Lat pulldown 3×8–12; chest press 3×8–12; chest supported row 2×8–12; hammer curl 3×8–12; overhead triceps extension 3×10–15; rear delt fly 2×12–15 |
-| Friday | Upper C · Chest + Arms | Incline dumbbell press 3×8–12; seated row 3×8–12; cable fly 2×10–15; lat pulldown 2×8–12; EZ-bar curl 2×8–12; pushdown 2×10–15 |
+| Monday | A · Heavy Push | Incline bench 4×5–8, bench press 3×5–8, dumbbell shoulder press 3×6–10, lateral raise 3×10–15, dips 2×6–10, triceps pushdown 2×8–12 |
+| Tuesday | B · Heavy Pull | Pull-ups 3×5–8, barbell row 3×6–8, lat pulldown 3×8–10, chest-supported row 2×8–10, rear-delt fly 3×10–15, EZ curl 3×6–10, hammer curl 2×8–12 |
+| Thursday | C · Upper Body Size | Incline dumbbell press 3×6–10, chest-supported row 3×6–10, overhead press 3×6–8, cable fly 2×10–12, lateral raise 3×10–15, incline curl 3×8–12, overhead triceps 3×8–12 |
+| Saturday | D · Legs + Core | Squat 3×5–8, Romanian deadlift 3×6–8, leg press 2×8–10, leg curl 3×8–12, calf raise 3×10–15, cable crunch 3×10–15 |
 
-Warm up before working sets. Choose weights you can control, leave about 1–2 reps in reserve, and increase the weight gradually when you reach the top of the rep range with good form. This is the requested upper-body routine. Exact exercises and sets are an app template, not an ACSM-prescribed routine. General programming reference: [ACSM resistance training guidance (2026)](https://acsm.org/resistance-training-guidelines-update-2026/).
+**For three sessions a week:** select **Hollywood Heavy · 3 Days** in **Programs**. Its full-body split still prioritizes heavy chest, shoulder, back and arm exercises, with legs and core included. Choosing either Hollywood plan automatically sets suitable default weekdays (you can change them afterward).
+
+- **Effort:** Choose a challenging weight and end most working sets with about 1–2 reps in reserve; keep 2 reps in reserve on heavy squats/RDLs. Don't test 1-rep max or train to failure every set.
+- **Progression:** When you can hit the high end of the target range on all working sets with good technique, increase the weight a small increment (often 2–5%) and work back up through the range.
+- **Rest:** 2.5–3 minutes for the heaviest compounds, around 75–120 seconds on accessories. Follow the exact rest time in the app.
+- **Warm-ups:** Do 5–10 minutes of easy movement, then 2–4 progressively heavier warm-up sets before the first main lift (mark them as W). Warm-up sets are **not** part of the listed working sets.
+- **Recovery:** Keep at least one rest day after two consecutive upper-body sessions. Sleep enough and eat a moderate calorie surplus with sufficient protein if gaining mass is your goal.
+- **Time:** Roughly 70–90 minutes including normal rests and warm-ups, depending on pace.
+
+References: [Jake Gyllenhaal's trainer on his *Road House* routine (Men's Health)](https://www.menshealth.com/fitness/a60175455/jake-gyllenhaal-workout-road-house/) and [ACSM resistance-training progression models](https://pubmed.ncbi.nlm.nih.gov/11828249/).
+
+Existing workout history, custom programs, selected weekdays and in-progress workout snapshots remain untouched on upgrade. Only a new installation starts with the new four-day default. Select a Hollywood plan in **Programs** to apply its recommended weekdays.
 
 ## Existing workout saving and accounts
 

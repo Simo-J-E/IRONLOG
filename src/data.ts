@@ -74,15 +74,114 @@ export const exercises: Exercise[] = [
   makeExercise('ab-wheel','Ab Wheel',['Core'],[], 'Ab wheel',[6,15],90),
 ]
 
-const pe = (exerciseId: string, sets: number, repMin: number, repMax: number, restSeconds: number) => ({ exerciseId, sets, repMin, repMax, restSeconds })
+const pe = (exerciseId: string, sets: number, repMin: number, repMax: number, restSeconds: number, note?: string) => ({ exerciseId, sets, repMin, repMax, restSeconds, ...(note ? { note } : {}) })
 
 export const programs: Program[] = [
   {
-    id:'chest-arms', name:'Chest, Back + Arms', description:'Three upper-body sessions with chest, back, biceps and triceps throughout the week.', daysPerWeek:3, duration:'50–65 min', focus:'Chest + Back + Arms', level:'Intermediate', featured:true, revision:2,
-    workouts:[
-      { id:'ca-a', name:'Upper A · Chest + Back', exercises:[pe('bench-press',3,6,10,150),pe('seated-row',3,8,12,120),pe('incline-db',2,8,12,120),pe('db-curl',3,8,12,75),pe('pushdown',3,10,15,75),pe('lateral-raise',2,12,15,60)]},
-      { id:'ca-b', name:'Upper B · Back + Arms', exercises:[pe('lat-pulldown',3,8,12,120),pe('chest-press',3,8,12,120),pe('chest-supported-row',2,8,12,120),pe('hammer-curl',3,8,12,75),pe('overhead-triceps',3,10,15,75),pe('rear-delt-fly',2,12,15,60)]},
-      { id:'ca-c', name:'Upper C · Chest + Arms', exercises:[pe('incline-db',3,8,12,120),pe('seated-row',3,8,12,120),pe('cable-fly',2,10,15,75),pe('lat-pulldown',2,8,12,120),pe('ez-curl',2,8,12,75),pe('pushdown',2,10,15,75)]}
+    // Keep this ID so existing users receive the new recommended routine without
+    // losing their selected program, workout history or active-session snapshots.
+    id: 'chest-arms',
+    name: 'Hollywood Heavy · 4 Days',
+    description: 'Four challenging gym sessions: heavy pressing, heavy pulling, upper-body size and strong legs. Actor-inspired, not a copy of a celebrity’s personal plan. Set weights you can control; do not max out every set.',
+    daysPerWeek: 4,
+    duration: '70–90 min',
+    focus: 'Chest · Shoulders · V-taper · Arms',
+    level: 'Intermediate',
+    featured: true,
+    revision: 3,
+    workouts: [
+      {
+        id: 'hh-push', name: 'A · Heavy Push',
+        exercises: [
+          pe('incline-bench', 4, 5, 8, 180, 'Main lift · leave 1–2 reps in reserve'),
+          pe('bench-press', 3, 5, 8, 180, 'Heavy and controlled · no bounced reps'),
+          pe('db-shoulder', 3, 6, 10, 150, 'Full range · avoid leaning back'),
+          pe('lateral-raise', 3, 10, 15, 75, 'Strict form · no swinging'),
+          pe('dips', 2, 6, 10, 120, 'Add weight only after bodyweight reps are solid'),
+          pe('pushdown', 2, 8, 12, 90, 'Hard sets · controlled elbows'),
+        ]
+      },
+      {
+        id: 'hh-pull', name: 'B · Heavy Pull',
+        exercises: [
+          pe('pull-up', 3, 5, 8, 180, 'Assisted if needed; add weight when 8 reps are clean'),
+          pe('barbell-row', 3, 6, 8, 180, 'Strict torso · no jerking'),
+          pe('lat-pulldown', 3, 8, 10, 120, 'Pull elbows down; full stretch'),
+          pe('chest-supported-row', 2, 8, 10, 120, 'Pause briefly at the top'),
+          pe('rear-delt-fly', 3, 10, 15, 75, 'Controlled rear-deltoid work'),
+          pe('ez-curl', 3, 6, 10, 90, 'Elbows stay still'),
+          pe('hammer-curl', 2, 8, 12, 90, 'No body swing'),
+        ]
+      },
+      {
+        id: 'hh-upper', name: 'C · Upper Body Size',
+        exercises: [
+          pe('incline-db', 3, 6, 10, 150, 'Heavy dumbbells · controlled lowering'),
+          pe('chest-supported-row', 3, 6, 10, 150, 'Full reach and hard pull'),
+          pe('overhead-press', 3, 6, 8, 180, 'Brace core; avoid back arch'),
+          pe('cable-fly', 2, 10, 12, 75, 'Smooth and full range'),
+          pe('lateral-raise', 3, 10, 15, 75, 'Controlled shoulder isolation'),
+          pe('incline-curl', 3, 8, 12, 90, 'Full stretch; no swinging'),
+          pe('overhead-triceps', 3, 8, 12, 90, 'Stretch triceps; controlled elbows'),
+        ]
+      },
+      {
+        id: 'hh-lower', name: 'D · Legs + Core',
+        exercises: [
+          pe('squat', 3, 5, 8, 180, 'Hard sets; keep 2 reps in reserve for safety'),
+          pe('rdl', 3, 6, 8, 180, 'Neutral back and controlled lowering'),
+          pe('leg-press', 2, 8, 10, 150, 'Controlled depth; no knee lockout'),
+          pe('leg-curl', 3, 8, 12, 90, 'Strict reps; no swinging'),
+          pe('calf-raise', 3, 10, 15, 75, 'Full stretch and pause'),
+          pe('cable-crunch', 3, 10, 15, 75, 'Use a challenging weight, not momentum'),
+        ]
+      }
+    ]
+  },
+  {
+    id: 'hollywood-heavy-3',
+    name: 'Hollywood Heavy · 3 Days',
+    description: 'Three heavy full-gym days for weeks when you train three times. Emphasis on chest, back, shoulders and arms, with serious lower-body work.',
+    daysPerWeek: 3,
+    duration: '70–90 min',
+    focus: 'Heavy full body · Upper emphasis',
+    level: 'Intermediate',
+    revision: 1,
+    workouts: [
+      {
+        id: 'hh3-upper-strength', name: 'A · Upper Strength',
+        exercises: [
+          pe('incline-bench', 4, 5, 8, 180, 'Heavy; 1–2 reps in reserve'),
+          pe('barbell-row', 3, 6, 8, 180, 'Strict heavy pulls'),
+          pe('db-shoulder', 3, 6, 10, 150, 'Controlled overhead pressing'),
+          pe('lat-pulldown', 3, 8, 10, 120, 'Full stretch'),
+          pe('ez-curl', 3, 8, 10, 90, 'No swinging'),
+          pe('pushdown', 3, 8, 12, 90, 'Strong controlled reps'),
+        ]
+      },
+      {
+        id: 'hh3-legs-chest', name: 'B · Legs + Chest',
+        exercises: [
+          pe('squat', 3, 5, 8, 180, 'Leave 2 reps in reserve'),
+          pe('rdl', 3, 6, 8, 180, 'Strict hinge; no max attempts'),
+          pe('bench-press', 3, 6, 8, 180, 'Heavy and controlled'),
+          pe('pull-up', 3, 5, 10, 150, 'Assisted if needed'),
+          pe('leg-curl', 3, 8, 12, 90, 'Controlled eccentric'),
+          pe('lateral-raise', 3, 10, 15, 75, 'No body swing'),
+        ]
+      },
+      {
+        id: 'hh3-upper-size', name: 'C · Upper Size + Abs',
+        exercises: [
+          pe('incline-db', 3, 6, 10, 150, 'Heavy dumbbells'),
+          pe('chest-supported-row', 3, 6, 10, 150, 'Full controlled range'),
+          pe('overhead-press', 3, 6, 8, 180, 'Brace core'),
+          pe('cable-fly', 2, 10, 12, 75, 'Strict reps'),
+          pe('hammer-curl', 3, 8, 12, 90, 'Controlled arms'),
+          pe('overhead-triceps', 3, 8, 12, 90, 'Stretch triceps'),
+          pe('cable-crunch', 3, 10, 15, 75, 'Load progressively'),
+        ]
+      }
     ]
   },
   { id:'beginner-full',name:'Beginner Full Body',description:'Simple whole-body base.',daysPerWeek:3,duration:'45–60 min',focus:'Full body',level:'Beginner',workouts:[{id:'bf-a',name:'Full Body A',exercises:[pe('squat',3,8,10,150),pe('bench-press',3,8,10,150),pe('lat-pulldown',3,8,12,120),pe('db-curl',2,10,12,75),pe('pushdown',2,10,12,75)]},{id:'bf-b',name:'Full Body B',exercises:[pe('leg-press',3,10,12,150),pe('overhead-press',3,8,10,120),pe('seated-row',3,8,12,120),pe('rdl',3,8,10,150),pe('plank',3,30,45,60)]}]},
