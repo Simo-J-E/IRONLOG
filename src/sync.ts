@@ -1,5 +1,5 @@
 import { api, ApiError } from './account'
-import { applyRemote, db, flushWrites, recoverWorkout, table } from './storage'
+import { applyRemote, db, flushWrites, recoverWorkout, reconcileGuestImportConflict, table } from './storage'
 import { collections, validateRecord } from './validation'
 import type { Account, RemoteRecord, SyncState } from './types'
 
@@ -48,6 +48,7 @@ async function performSync(account: Account, report: (status: SyncStatus) => voi
           if (latest) await store.sync.put({ ...latest, revision: ack.revision, dirty: latest.mutationId === ack.mutationId ? 0 : 1, conflict: undefined })
         }
         for (const remote of result.conflicts) {
+          if (await reconcileGuestImportConflict(store, remote)) continue
           const state = await store.sync.get(`${remote.collection}:${remote.id}`)
           if (state) await store.sync.put({ ...state, conflict: remote })
         }

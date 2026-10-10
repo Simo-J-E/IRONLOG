@@ -12,6 +12,12 @@ The original Node.js backend still works locally or on a Node server. For GitHub
 
 Offline workout tracker with optional accounts, sync and automatic rankings. React + TypeScript + IndexedDB; a small Node.js 24 server with SQLite. Includes a workout calendar, complete session history and a three-day chest, back and arms plan.
 
+### Automatic device-to-account sync
+
+When a user creates an account or signs in, IRONLOG automatically copies saved guest workouts, custom programs, custom exercises and (for a new account) device preferences into the signed-in account. There is no opt-in checkbox. Each device contributes missing guest history when the user signs in there. Existing cloud history is downloaded first and is never overwritten by guest imports. Imported records sync automatically and retry after a connection failure. Local guest data is left in place as a backup, and previously imported workouts are not re-imported if later deleted from the account.
+
+Sign in on each device to transfer its guest workouts, and wait until **Synced to your account** appears before clearing device/browser storage. Concurrent edits to the same already-synced workout can still require manual conflict resolution.
+
 ## Start locally
 
 Install **Node.js 24.13 or newer**, then run:
@@ -21,7 +27,7 @@ npm ci
 npm run dev
 ```
 
-Open the Vite address printed in the terminal, normally `http://localhost:5173`. This starts the frontend and backend together. In **Profile → Account**, create an account or sign in. Select **Copy my guest workouts** to bring existing local training into your account. Account creation needs no API keys or external authentication service.
+Open the Vite address printed in the terminal, normally `http://localhost:5173`. This starts the frontend and backend together. In **Profile → Account**, create an account or sign in. Any guest workouts, custom exercises and programs saved on that device are automatically merged into the account. No import checkbox is needed. Account creation needs no API keys or external authentication service.
 
 To run a built version:
 

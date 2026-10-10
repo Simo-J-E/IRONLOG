@@ -184,6 +184,117 @@ export async function importAllData(json: string) {
   })
   changed()
 }
+/** Workouts imported by an older IRONLOG version have a fresh updatedAt. */
+function sameTrainingRecord(a: StoredRecord, b: StoredRecord) {
+  const comparable = (value: StoredRecord) => 'startedAt' in value ? { ...value, updatedAt: undefined } : value
+  return JSON.stringify(comparable(a)) === JSON.stringify(comparable(b))
+}
+
+/**
+ * Attach training saved before sign-in to the account on this device.
+ * A per-account import journal makes the operation repeatable without
+ * resurrecting workouts that were subsequently deleted from the account.
+ * The guest database remains untouched as an offline backup.
+ */
+export async function mergeGuestTrainingData(accountId: string): Promise<number> {
+  const store = db
+  if (store.name !== `ironlog-account-${accountId}`) return 0
+  await flushWrites()
+  const guest = new IronlogDB('ironlog')
+  try {
+    await guest.open()
+    await recoverWorkout(guest)
+    await flushWrites()
+    const [workouts, guestPrograms, guestExercises, guestSettings] = await Promise.all([
+      guest.workouts.toArray(), guest.programs.toArray(), guest.exercises.toArray(), guest.settings.get('settings'),
+    ])
+    const sources: { collection: Collection; record: StoredRecord }[] = [
+      ...workouts.map(record => ({ collection: 'workouts' as const, record })),
+      ...guestPrograms.filter(record => record.custom).map(record => ({ collection: 'programs' as const, record })),
+      ...guestExercises.filter(record => record.custom).map(record => ({ collection: 'exercises' as const, record })),
+    ]
+    let imported = 0
+    await store.transaction('rw', [...collections.map(c => table(store, c)), store.sync, store.meta], async () => {
+      for (const { collection, record } of sources) {
+        // Do not import bad/partial recovery data into a good account.
+        if (!validateRecord(collection, record)) continue
+        const importKey = `guest-import:${collection}:${record.id}`
+        if (await store.meta.get(importKey)) continue
+        const previous = await table(store, collection).get(record.id)
+        // A sync tombstone means this account already deleted the record.
+        // Don't silently resurrect it from a stale guest copy.
+        if (!previous && await store.sync.get(`${collection}:${record.id}`)) {
+          await store.meta.put({ key: importKey, value: record.id })
+          continue
+        }
+        // Distinct versions of the same ID must never overwrite one another.
+        const identical = previous && sameTrainingRecord(previous, record)
+        const target = previous && !identical ? { ...structuredClone(record), id: crypto.randomUUID() } : structuredClone(record)
+        if (!previous || !identical) {
+          const key = `${collection}:${target.id}`
+          await table(store, collection).put(target)
+          await store.sync.put({ key, collection, id: target.id, revision: 0, mutationId: crypto.randomUUID(), dirty: 1 })
+          await store.meta.put({ key: `guest-imported-record:${key}`, value: record.id })
+          imported++
+        }
+        await store.meta.put({ key: importKey, value: target.id })
+      }
+      // Apply guest preferences only to a new account that has never synced
+      // settings. Another device's account settings should take precedence.
+      if (guestSettings && validateRecord('settings', guestSettings) && !await store.meta.get('guest-import:settings:settings')) {
+        if (!await store.sync.get('settings:settings')) {
+          await table(store, 'settings').put(guestSettings)
+          await store.sync.put({ key: 'settings:settings', collection: 'settings', id: 'settings', revision: 0, mutationId: crypto.randomUUID(), dirty: 1 })
+          await store.meta.put({ key: 'guest-imported-record:settings:settings', value: 'settings' })
+          imported++
+        }
+        await store.meta.put({ key: 'guest-import:settings:settings', value: 'settings' })
+      }
+    })
+    if (imported) changed()
+    return imported
+  } finally {
+    guest.close()
+  }
+}
+
+/** Resolve server ID collisions from guest imports without losing either copy. */
+export async function reconcileGuestImportConflict(store: IronlogDB, remote: RemoteRecord): Promise<boolean> {
+  const key = `${remote.collection}:${remote.id}`
+  const source = await store.meta.get(`guest-imported-record:${key}`)
+  const state = await store.sync.get(key)
+  if (typeof source?.value !== 'string' || !state?.dirty || state.revision !== 0) return false
+  const local = await table(store, remote.collection).get(remote.id)
+  if (!local) return false
+  if (remote.collection === 'settings') {
+    // Settings cannot be duplicated because they have a fixed ID. Preserve
+    // guest settings for export, and accept existing cloud settings instead.
+    await store.meta.put({ key: `conflict-backup:${crypto.randomUUID()}`, value: { savedAt: timestamp(), local, remote } })
+    await store.sync.delete(key)
+    await store.meta.delete(`guest-imported-record:${key}`)
+    await applyRemote(store, remote)
+    return true
+  }
+  if (remote.data && sameTrainingRecord(remote.data, local)) {
+    await store.sync.delete(key)
+    await store.meta.delete(`guest-imported-record:${key}`)
+    await applyRemote(store, remote)
+    return true
+  }
+  const newId = crypto.randomUUID()
+  const moved = { ...local, id: newId }
+  await table(store, remote.collection).put(moved)
+  const movedKey = `${remote.collection}:${newId}`
+  await store.sync.put({ key: movedKey, collection: remote.collection, id: newId, revision: 0, mutationId: crypto.randomUUID(), dirty: 1 })
+  await store.meta.put({ key: `guest-import:${remote.collection}:${source.value}`, value: newId })
+  await store.meta.put({ key: `guest-imported-record:${movedKey}`, value: source.value })
+  await table(store, remote.collection).delete(remote.id)
+  await store.sync.delete(key)
+  await store.meta.delete(`guest-imported-record:${key}`)
+  await applyRemote(store, remote)
+  return true
+}
+
 export async function deleteAllData() {
   await flushWrites()
   const store = db

@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Visit `http://localhost:5173`. Open **Profile → Account → Create account**, choose a username and a password of at least 12 characters, and check **Copy my guest workouts** if you were already logging workouts. Wait for **Synced to your account** in Profile. Data goes into `data/ironlog.sqlite`; don't delete that directory.
+Visit `http://localhost:5173`. Open **Profile → Account → Create account**, choose a username and a strong password; existing guest workouts and custom plans on the device are added automatically. Wait for **Synced to your account** in Profile. Data goes into `data/ironlog.sqlite`; don't delete that directory.
 
 You can test recovery: record a workout, wait for sync, open the site in a second browser, sign into the same account and check History. You must keep the server running for sync to work.
 
@@ -29,7 +29,7 @@ On an always-on computer or VPS with Docker Compose:
    ```sh
    docker compose -f compose.yaml -f compose.public.yaml up -d --build
    ```
-4. Visit your **HTTPS** URL, register or sign in, optionally import guest workouts, and wait for **Synced to your account**. You can now sign into the same account from another phone or computer.
+4. Visit your **HTTPS** URL, register or sign in, automatically merge any device workouts, and wait for **Synced to your account**. You can now sign into the same account from another phone or computer.
 
 Caddy automatically requests and renews the HTTPS certificate. Use the optional `compose.public.yaml` only if **nothing else occupies ports 80/443**. If you already use a reverse proxy, use just `docker compose up -d --build` and forward your HTTPS hostname to `127.0.0.1:3001` (the original `compose.yaml` file).
 

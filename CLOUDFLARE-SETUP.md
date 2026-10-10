@@ -44,7 +44,7 @@ Requirements: Node.js 24+ and a free [Cloudflare account](https://dash.cloudflar
 
 7. Push this updated project to your existing GitHub repository. The included GitHub Actions workflow builds the frontend with `IRONLOG_API_URL` and publishes it to GitHub Pages.
 
-8. Open your GitHub Pages website → **Profile → Account → Create account**. Choose **Copy my guest workouts and programs** if you have existing local guest data. After the account says **Synced to your account**, sign in on another device to test.
+8. Open your GitHub Pages website → **Profile → Account → Create account**. Guest workouts and custom training data on that device are automatically added to the account. After the account says **Synced to your account**, sign in on another device to test.
 
 **Important:** A Worker deployment does not deploy the GitHub Pages frontend. Pushing the code to GitHub does that. GitHub Pages must be enabled in repository settings with source **GitHub Actions**.
 

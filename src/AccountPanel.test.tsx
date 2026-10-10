@@ -16,6 +16,7 @@ it('allows 1–50 characters for new usernames/passwords, slash usernames, and r
     onDelete={async () => {}}
   />)
   fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(screen.queryByRole('checkbox', { name: /copy my guest/i })).not.toBeInTheDocument()
   const username = screen.getByRole('textbox', { name: 'Username' }) as HTMLInputElement
   const email = screen.getByRole('textbox', { name: 'Email' }) as HTMLInputElement
   const password = screen.getByLabelText('Password') as HTMLInputElement

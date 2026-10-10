@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { db, seedDatabase, deleteAllData, exportAllData, importAllData, switchDatabase, saveWorkout, putRecord, removeRecord, checkpointWorkout, clearRecovery, flushWrites, timestamp, resumeIndex, remainingRest, requestPersistentStorage } from './storage'
+import { db, seedDatabase, deleteAllData, exportAllData, importAllData, switchDatabase, saveWorkout, putRecord, removeRecord, checkpointWorkout, clearRecovery, flushWrites, mergeGuestTrainingData, timestamp, resumeIndex, remainingRest, requestPersistentStorage } from './storage'
 import { exercises as builtInExercises, programs as builtInPrograms } from './data'
 import { detectNewPr, displayWeight, epley, inputToKg, roundWeight, workoutVolume } from './utils'
 import { translate } from './i18n'
@@ -66,7 +66,16 @@ export default function App() {
   useEffect(()=>{
     if(booted.current)return
     booted.current=true
-    switchDatabase(cachedAccount()?.id).then(()=>reload(true)).then(()=>setReady(true)).catch(showError)
+    const signedIn = cachedAccount()
+    void switchDatabase(signedIn?.id).then(async () => {
+      if (signedIn) {
+        await syncAccount(signedIn, setSyncStatus)
+        const imported = await mergeGuestTrainingData(signedIn.id)
+        if (imported) setSyncStatus({ state: 'syncing', message: 'Uploading device training…', pending: imported, conflicts: [] })
+      }
+      await reload(true)
+      setReady(true)
+    }).catch(showError)
   },[reload,showError])
   useEffect(()=>{
     const timer=window.setInterval(()=>setNow(Date.now()),1000)
@@ -168,7 +177,7 @@ export default function App() {
   }
   async function importData(file?:File){if(!file)return;try{await importAllData(await file.text());activeRef.current=null;setActiveLog(null);await reload(true);setError('')}catch(e){showError(e)}finally{if(fileInput.current)fileInput.current.value=''}}
   async function wipe(){if(!confirm(account?'Delete this account’s training data? This will also sync deletions to your other devices.':'Delete all IRONLOG data on this device?'))return;try{await deleteAllData();activeRef.current=null;setActiveLog(null);await reload();setView('today')}catch(e){showError(e)}}
-  async function changeIdentity(user:Account|null, guestBackup?:string|null, erasePrevious=false){
+  async function changeIdentity(user:Account|null, erasePrevious=false){
     setReady(false);setError('')
     const previous=db
     if(activeRef.current&&!erasePrevious)checkpointWorkout(activeRef.current,previous)
@@ -177,16 +186,19 @@ export default function App() {
       if(erasePrevious){await flushWrites();clearRecovery(previous);await previous.delete()}
       cacheAccount(user);setAccount(user);setSyncStatus(localStatus)
       await switchDatabase(user?.id)
-      if(guestBackup)await importAllData(guestBackup)
+      if(user){
+        await syncAccount(user,setSyncStatus)
+        const imported = await mergeGuestTrainingData(user.id)
+        if (imported) setSyncStatus({ state: 'syncing', message: 'Uploading device training…', pending: imported, conflicts: [] })
+      }
       await reload(true);setReady(true)
     }catch(e){showError(e);throw e}
   }
   async function authenticate(input:Credentials){
     await waitForSync();await flushWrites()
-    const guestBackup=input.importGuest&&db.name==='ironlog'?await exportAllData(activeRef.current):null
     const result=await api<{user:Account;token?:string}>(input.register?'/auth/register':'/auth/login','POST',{username:input.username,email:input.register?input.email:undefined,password:input.password,ranked:input.ranked})
     if (result.token) saveSessionToken(result.token)
-    await changeIdentity(result.user,guestBackup);void requestPersistentStorage()
+    await changeIdentity(result.user);void requestPersistentStorage()
   }
   async function logout(){
     await waitForSync();await flushWrites();await api('/auth/logout','POST',{});saveSessionToken(null)
@@ -194,7 +206,7 @@ export default function App() {
   }
   async function deleteAccount(password:string){
     await waitForSync();await api('/account','DELETE',{password});saveSessionToken(null)
-    await changeIdentity(null,null,true);setView('today')
+    await changeIdentity(null,true);setView('today')
   }
   const syncNow=async()=>{if(account)await syncAccount(account,setSyncStatus)}
   if(!ready)return <main className="loading"><div><strong>IRONLOG</strong>{error&&<><p role="alert">{error}</p><button onClick={()=>window.location.reload()}>Retry</button><button onClick={exportData}>Export recovery data</button></>}</div></main>
