@@ -49,7 +49,7 @@ export async function seedDatabase(store = db) {
     for (const e of exercises) if (!await store.exercises.get(e.id)) await store.exercises.put(e)
     const settings = await store.settings.get('settings')
     if (pendingSettings) await store.settings.put(pendingSettings)
-    else if (!settings) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 3, 5], autoRest: true, scheduleStartDate: localDateKey(new Date()) })
+    else if (!settings) await store.settings.put({ id: 'settings', language: navigator.language.toLowerCase().startsWith('fi') ? 'fi' : 'en', unit: 'kg', onboardingDone: false, activeProgramId: 'chest-arms', trainingDays: [1, 2, 4, 6], autoRest: true, scheduleStartDate: localDateKey(new Date()) })
     else if (!settings.scheduleStartDate) await store.settings.put({ ...settings, scheduleStartDate: localDateKey(new Date()) })
   })
   if (pendingSettings) {
