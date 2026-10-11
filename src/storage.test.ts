@@ -142,7 +142,7 @@ it('updates the recommended built-in plan while preserving logs, snapshots, sett
   await db.settings.put({ ...settings, activeProgramId: custom.id, trainingDays: [0, 2, 4], scheduleStartDate: undefined })
   await switchDatabase()
   expect((await db.programs.get('chest-arms'))?.name).toBe('Hollywood Heavy · 4 Days')
-  expect((await db.programs.get('chest-arms'))?.revision).toBe(3)
+  expect((await db.programs.get('chest-arms'))?.revision).toBe(4)
   expect(await db.programs.get(custom.id)).toEqual(custom)
   expect(await db.workouts.get(finished.id)).toEqual(finished)
   expect(await db.settings.get('settings')).toMatchObject({ activeProgramId: custom.id, trainingDays: [0, 2, 4] })
