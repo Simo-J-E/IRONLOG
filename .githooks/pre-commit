@@ -1,0 +1,5 @@
+#!/bin/sh
+# Checks only: no --fix, --write, staging or code changes.
+set -e
+printf '\nIRONLOG pre-commit: checking lint, types and tests (no auto-fix).\n'
+npm run check:precommit

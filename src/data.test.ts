@@ -9,9 +9,9 @@ const three = programs.find(p => p.id === 'hollywood-heavy-3')!
 
 describe('Hollywood Heavy programming', () => {
   it('replaces the existing featured program in place so prior selections upgrade', () => {
-    expect(four).toMatchObject({ featured: true, daysPerWeek: 4, revision: 3 })
+    expect(four).toMatchObject({ featured: true, daysPerWeek: 4, revision: 4 })
     expect(four.workouts).toHaveLength(4)
-    expect(three).toMatchObject({ daysPerWeek: 3 })
+    expect(three).toMatchObject({ daysPerWeek: 3, revision: 2 })
     expect(three.workouts).toHaveLength(3)
   })
 
@@ -19,8 +19,10 @@ describe('Hollywood Heavy programming', () => {
     const known = new Set(exercises.map(exercise => exercise.id))
     for (const program of [three, four]) {
       expect(validateRecord('programs', program)).toBe(true)
+      expect(program.duration).toBe('~75 min')
       for (const workout of program.workouts) {
         expect(workout.exercises.length).toBeGreaterThanOrEqual(6)
+        expect(workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0)).toBeGreaterThanOrEqual(20)
         for (const exercise of workout.exercises) {
           expect(known.has(exercise.exerciseId)).toBe(true)
           expect(exercise.sets).toBeGreaterThanOrEqual(2)

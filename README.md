@@ -49,7 +49,7 @@ Open `http://localhost:3001`. Keep using the same browser and website address: b
 - On rest days, Today previews the next scheduled session. Starting it early, or doing a missed session from the calendar, records it on the date you actually train. It does not mark a future date complete. Future dates in the calendar are previews.
 - **History** now lists every saved session, newest first, including unfinished sessions. Expand one to see the date, duration, exercises, every set's weight/reps, warm-ups, completion status and notes. Search by workout/exercise name or filter by dates. Only completed working sets contribute to volume. Units follow your profile.
 - **Finish → View history** opens your completed workout log directly. **Save & exit** leaves a session unfinished; use **Resume workout** to continue.
-- Existing browser data upgrades in place. The previous recommended plan becomes **Hollywood Heavy · 4 Days** (revision 3). Custom plans, saved sessions and active workout snapshots are preserved. Other selected plans remain selected.
+- Existing browser data upgrades in place. The previous recommended plan becomes **Hollywood Heavy · 4 Days** (revision 4). Custom plans, saved sessions and active workout snapshots are preserved. Other selected plans remain selected.
 
 ### Recommended plan — Hollywood Heavy (4 days)
 
@@ -57,10 +57,10 @@ Train all four days hard, but always with good form. Main lifts use relatively h
 
 | Day | Session | Working sets × reps |
 | --- | --- | --- |
-| Monday | A · Heavy Push | Incline bench 4×5–8, bench press 3×5–8, dumbbell shoulder press 3×6–10, lateral raise 3×10–15, dips 2×6–10, triceps pushdown 2×8–12 |
-| Tuesday | B · Heavy Pull | Pull-ups 3×5–8, barbell row 3×6–8, lat pulldown 3×8–10, chest-supported row 2×8–10, rear-delt fly 3×10–15, EZ curl 3×6–10, hammer curl 2×8–12 |
-| Thursday | C · Upper Body Size | Incline dumbbell press 3×6–10, chest-supported row 3×6–10, overhead press 3×6–8, cable fly 2×10–12, lateral raise 3×10–15, incline curl 3×8–12, overhead triceps 3×8–12 |
-| Saturday | D · Legs + Core | Squat 3×5–8, Romanian deadlift 3×6–8, leg press 2×8–10, leg curl 3×8–12, calf raise 3×10–15, cable crunch 3×10–15 |
+| Monday | A · Heavy Push | Incline bench 4×5–8, bench press 3×5–8, dumbbell shoulder press 3×6–10, lateral raise 3×10–15, dips 3×6–10, triceps pushdown 3×8–12, cable fly 3×10–12 |
+| Tuesday | B · Heavy Pull | Pull-ups 4×5–8, barbell row 3×6–8, lat pulldown 3×8–10, chest-supported row 3×8–10, rear-delt fly 4×10–15, EZ curl 3×6–10, hammer curl 3×8–12 |
+| Thursday | C · Upper Body Size | Incline dumbbell press 4×6–10, chest-supported row 3×6–10, overhead press 3×6–8, cable fly 4×10–12, lateral raise 3×10–15, incline curl 4×8–12, overhead triceps 3×8–12 |
+| Saturday | D · Legs + Core | Squat 3×5–8, Romanian deadlift 3×6–8, leg press 3×8–10, leg curl 4×8–12, calf raise 5×10–15, leg extension 3×10–15, cable crunch 3×10–15 |
 
 **For three sessions a week:** select **Hollywood Heavy · 3 Days** in **Programs**. Its full-body split still prioritizes heavy chest, shoulder, back and arm exercises, with legs and core included. Choosing either Hollywood plan automatically sets suitable default weekdays (you can change them afterward).
 
@@ -69,7 +69,7 @@ Train all four days hard, but always with good form. Main lifts use relatively h
 - **Rest:** 2.5–3 minutes for the heaviest compounds, around 75–120 seconds on accessories. Follow the exact rest time in the app.
 - **Warm-ups:** Do 5–10 minutes of easy movement, then 2–4 progressively heavier warm-up sets before the first main lift (mark them as W). Warm-up sets are **not** part of the listed working sets.
 - **Recovery:** Keep at least one rest day after two consecutive upper-body sessions. Sleep enough and eat a moderate calorie surplus with sufficient protein if gaining mass is your goal.
-- **Time:** Roughly 70–90 minutes including normal rests and warm-ups, depending on pace.
+- **Time:** Aim for about **75 minutes per session** including 5–10 minutes of warm-up, normal rest periods and exercise transitions. Actual time depends on your pace; there is no enforced timer.
 
 References: [Jake Gyllenhaal's trainer on his *Road House* routine (Men's Health)](https://www.menshealth.com/fitness/a60175455/jake-gyllenhaal-workout-road-house/) and [ACSM resistance-training progression models](https://pubmed.ncbi.nlm.nih.gov/11828249/).
 
@@ -149,6 +149,16 @@ npm run backup -- backups/ironlog.sqlite
 Set `DATABASE_PATH` when using a different database path. In Docker, the automatic snapshots are available under `/app/data/backups/` and can be copied out with `docker compose cp ironlog:/app/data/backups ./ironlog-backups`. Keep snapshots in a different physical location. **Backups contain account password hashes and private workout history; do not publish them.** Restore with the server stopped. See BACKEND-SETUP.md.
 
 Signing out keeps that account’s local copy for offline recovery; it never becomes guest data or another account’s data. Profile offers both training-data deletion and password-confirmed account deletion. Account deletion removes the server account and its records plus this browser’s account copy. Other devices may retain offline copies until their website data is cleared.
+
+## Read-only pre-commit and CI checks
+
+`npm ci` (or `npm install`) installs the local Git pre-commit hook automatically when you are in the repository. You can also run `npm run prepare` to install it manually. Before each commit it runs **lint, TypeScript type checks and unit tests**; errors block the commit and remain visible for you to fix. None of these commands uses `--fix`, `--write`, stages code or reformats files.
+
+```bash
+npm run check:precommit
+```
+
+CI runs checks, backend and browser tests, and a production build. The build writes only ignored `dist/` output. CI has read-only repository permissions, verifies no tracked files changed, and publishes the generated Pages artifact only when validation succeeds. It never commits or pushes fixes.
 
 ## Validation
 
